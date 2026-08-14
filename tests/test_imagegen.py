@@ -117,8 +117,8 @@ class TestGenerateImage:
             await imagegen.generate_image(cfg, "p1", tmp_path / "1.png", interval=0.5)
             await imagegen.generate_image(cfg, "p2", tmp_path / "2.png", interval=0.5)
 
-        # 第二次调用前应 sleep(interval)
-        assert 0.5 in sleeps
+        # 第二次调用前应因限速 sleep（约等于 interval=0.5）
+        assert len(sleeps) == 1 and 0.4 < sleeps[0] <= 0.5
 
 
 @pytest.fixture(autouse=True)
