@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+httpx
+pillow
+edge-tts
+pytest
+pytest-asyncio
+respx
+beautifulsoup4
+lxml
+python-dotenv
+playwright
