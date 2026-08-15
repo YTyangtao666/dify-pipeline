@@ -110,16 +110,23 @@ def main(body: str) -> dict:
 - 走「是」分支 → 输出里有 `P001.mp4` 生成日志
 - 或故意把阈值改 95 逼走「否」分支 → 输出 3 条 Prompt 建议
 
-## 6. 常见坑
+## 6. 常见坑（实战验证，全部踩过）
 
 | 症状 | 原因 | 解法 |
 |------|------|------|
 | HTTP 节点 `connection refused` | URL 用了 127.0.0.1 | 改 `host.docker.internal:8100` |
-| HTTP 节点超时 | 默认 10s 超时太短 | 读取超时调 3600 |
-| LLM 节点连不上中转站 | 容器无代理 | 给 docker-nginx/api 容器加 `HTTPS_PROXY` 环境变量，或模型选本地 Ollama |
-| 代码节点取不到 JSON | HTTP 输出选了 headers | 变量选择器选 `body` |
-| 导入 DSL 报版本错 | Dify 版本≠1.9.0 | 用 4.x 手动搭（本教程 4 节就是逐步版） |
-| 首页 502 | 容器还在初始化 | `docker compose logs -f docker-api-1` 等 DB migration 完成 |
+| 导入 DSL 后 Run Steps=0（静默空跑） | **边字段用错**：`sourceID/targetID` 是旧格式 | 必须用 `source/target` + `data.sourceType/targetType`（对照 api/tests/fixtures 的官方样例） |
+| pydantic 校验 `timeout` 报错 | HTTP 节点 timeout 不能是整数 | 用对象 `{connect, read, write}`（毫秒） |
+| if-else 校验 `comparison_operator` 报错 | `>=` 不是合法字面量 | Dify 用 unicode 符号 `≥` `≤` `≠` |
+| if-else 校验 `logical_operator missing` | ELSE 分支也要该字段 | 每个 case 都补 `logical_operator: and` |
+| LLM 节点报 `plugin not found` | Dify 1.x 模型全走插件系统 | 装 `langgenius/openai_api_compatible` 插件（marketplace API 直装最快） |
+| 容器访问外网 `Network is unreachable` | 宿主 VPN 是应用层代理 | compose `x-shared-env` 加 `HTTP_PROXY=http://host.docker.internal:7897` |
+| 加代理后内网服务 502 | **小写 no_proxy 覆盖大写 NO_PROXY**（镜像 entrypoint 默认值） | 小写 no_proxy 也写全内网域名+网段，且 `--force-recreate`（compose 不重建未变更容器） |
+| URL 导入 DSL 一直 404 | ssrf_proxy 的 squid 把所有代理请求转给 sandbox 父节点 | 用文件上传方式（本仓库 dify/serve_dsl.py 起 CORS 服务+浏览器注入） |
+| 重建容器后 502 | nginx 缓存了 api 旧 IP | `docker restart docker-nginx-1` |
+| 模型凭据验证 `Invalid URL .../chat/completions/chat/completions` | endpoint_url 填了完整路径 | 只填到 `https://yunwu.ai/v1`，插件自动拼 |
+| 评分大量 score=0 | VLM 网络抖动解析失败被误判 | 已修：解析失败纳入重试循环（见 tests/test_evaluator_resilience.py） |
+| LLM 节点 403 insufficient_quota | 中转站配额耗尽 | 账号充值或换 key，代码无需改动 |
 
 ## 7. 定时触发（可选）
 
