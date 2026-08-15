@@ -32,9 +32,9 @@ def scrape(keyword: str = "保温杯", limit: int = 5):
     return run([PY, "scripts/01_scrape_products.py", "--keyword", keyword, "--limit", str(limit)])
 
 
-@app.post("/generate")         # 02 生图
-def generate(limit: int = 2):
-    return run([PY, "scripts/02_generate_images.py", "--limit", str(limit)])
+@app.post("/generate")         # 02 生图（mode: styles=3风格×2张 / screens=8屏视觉逼单）
+def generate(limit: int = 2, mode: str = "styles"):
+    return run([PY, "scripts/02_generate_images.py", "--limit", str(limit), "--mode", mode])
 
 
 @app.post("/evaluate")         # 03 评分
@@ -42,9 +42,12 @@ def evaluate():
     return run([PY, "scripts/03_eval_images.py"])
 
 
-@app.post("/video/{pid}")      # 04 视频
-def video(pid: str):
-    return run([PY, "scripts/04_make_video.py", "--product", pid])
+@app.post("/video/{pid}")      # 04 视频（script_category 可选：脚本库分类驱动口播）
+def video(pid: str, script_category: str | None = None):
+    cmd = [PY, "scripts/04_make_video.py", "--product", pid]
+    if script_category:
+        cmd += ["--script-category", script_category]
+    return run(cmd)
 
 
 @app.get("/report")            # 读取最新评分报告（Dify 条件分支取数用）
