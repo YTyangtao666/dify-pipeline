@@ -110,6 +110,11 @@ async def evaluate_image(cfg: Config, image_path: Path, product_title: str,
                 content = resp.json()["choices"][0]["message"].get("content") or ""
                 data = extract_json(content)
                 if data is None:
+                    # 解析失败也重试（VLM 偶发不按格式输出），耗尽后返回 parse_ok=False
+                    last_err = "unparsable VLM output"
+                    if attempt < RETRY_MAX:
+                        await asyncio.sleep(BACKOFF_BASE ** (attempt + 1))
+                        continue
                     v = Verdict(usable=False, score=0, parse_ok=False,
                                 image=image_path.name)
                     if own:
