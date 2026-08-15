@@ -1,16 +1,12 @@
 #!/bin/bash
 # 每日定时触发 Dify 工作流跑全链路（launchd 调用）
-# DIFY_API_KEY 在 Dify「访问 API → API 密钥」生成后填到这里
 set -u
 
 DIFY_BASE="http://127.0.0.1/v1"
-DIFY_API_KEY="${DIFY_API_KEY:-填你的Dify应用API密钥}"
+DIFY_API_KEY="REMOVED-LEAKED-KEY"
 PRODUCT_ID="${1:-P001}"
 
-resp=$(curl -sS --max-time 7200 -X POST "$DIFY_BASE/workflows/run" \
-  -H "Authorization: Bearer $DIFY_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"inputs\":{\"product_id\":\"$PRODUCT_ID\",\"gen_limit\":2},\"response_mode\":\"blocking\",\"user\":\"cron\"}")
+resp=$(curl -sS --max-time 7200 -X POST "$DIFY_BASE/workflows/run" -H "Authorization: Bearer $DIFY_API_KEY" -H "Content-Type: application/json" -d "{\"inputs\":{\"product_id\":\"$PRODUCT_ID\",\"gen_limit\":2},\"response_mode\":\"blocking\",\"user\":\"cron\"}")
 
 echo "[$(date '+%F %T')] trigger $PRODUCT_ID"
 echo "$resp" | tail -c 500
