@@ -1,0 +1,404 @@
+kind: app
+app:
+  description: 商品图生成 → VLM质检 → 自动视频合成 全链路
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: workflow
+  name: AI商品图视频流水线
+  use_icon_as_answer_icon: false
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables:
+    - description: FastAPI服务地址（Dify在Docker内，宿主服务用host.docker.internal）
+      id: api-base-env
+      name: API_BASE
+      selector: []
+      value: http://host.docker.internal:8100
+      value_type: string
+  features:
+    file_upload:
+      enabled: false
+      image_file:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+          - local_file
+          - remote_url
+      number_limits: 3
+  graph:
+    edges:
+      - id: start-gen
+        sourceID: start
+        targetID: gen-images
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - id: gen-eval
+        sourceID: gen-images
+        targetID: eval-images
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - id: eval-parse
+        sourceID: eval-images
+        targetID: parse-report
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - id: parse-branch
+        sourceID: parse-report
+        targetID: check-rate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - id: branch-video
+        sourceID: check-rate
+        targetID: make-video
+        sourceHandle: 'true'
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - id: branch-llm
+        sourceID: check-rate
+        targetID: llm-advice
+        sourceHandle: 'false'
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - id: video-end
+        sourceID: make-video
+        targetID: end-video
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - id: llm-end
+        sourceID: llm-advice
+        targetID: end-advice
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        zIndex: 0
+    nodes:
+      - id: start
+        position:
+          x: 50
+          y: 300
+        positionAbsolute:
+          x: 50
+          y: 300
+        data:
+          desc: ''
+          selected: false
+          title: 开始
+          type: start
+          variables:
+            - variable: product_id
+              label: 商品ID
+              type: text-input
+              required: true
+              max_length: 48
+              options: []
+            - variable: gen_limit
+              label: 生图商品数
+              type: number
+              required: false
+              default: 2
+              options: []
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 116
+        selected: false
+      - id: gen-images
+        position:
+          x: 350
+          y: 300
+        positionAbsolute:
+          x: 350
+          y: 300
+        data:
+          desc: ''
+          selected: false
+          title: 生成商品图
+          type: http-request
+          method: post
+          url: '{{#env.API_BASE#}}/generate'
+          headers: 'Content-Type:application/json'
+          params: ''
+          body:
+            type: json
+            data: '{"limit": {{#start.gen_limit#}}}'
+          authorization:
+            type: no-auth
+            config: null
+          timeout: 3600000
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 120
+        selected: false
+      - id: eval-images
+        position:
+          x: 650
+          y: 300
+        positionAbsolute:
+          x: 650
+          y: 300
+        data:
+          desc: ''
+          selected: false
+          title: VLM质检评分
+          type: http-request
+          method: post
+          url: '{{#env.API_BASE#}}/evaluate'
+          headers: ''
+          params: ''
+          body:
+            type: none
+            data: []
+          authorization:
+            type: no-auth
+            config: null
+          timeout: 3600000
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 120
+        selected: false
+      - id: parse-report
+        position:
+          x: 950
+          y: 300
+        positionAbsolute:
+          x: 950
+          y: 300
+        data:
+          desc: ''
+          selected: false
+          title: 解析评分报告
+          type: code
+          code_language: python3
+          code: |
+            def main(body: str) -> dict:
+                out = body or ""
+                rate = None
+                top_issue = ""
+                for line in out.splitlines():
+                    if "总体可用率" in line:
+                        try:
+                            rate = float(line.split("总体可用率")[1].split("%")[0].strip())
+                        except Exception:
+                            pass
+                    if "top_issue=" in line:
+                        top_issue = line.split("top_issue=")[1].strip()
+                return {
+                    "rate": rate if rate is not None else -1,
+                    "passed": "yes" if (rate is not None and rate >= 80) else "no",
+                    "top_issue": top_issue,
+                }
+          variables:
+            - variable: body
+              value_selector:
+                - eval-images
+                - body
+          outputs:
+            rate:
+              children: null
+              type: number
+            passed:
+              children: null
+              type: string
+            top_issue:
+              children: null
+              type: string
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 54
+        selected: false
+      - id: check-rate
+        position:
+          x: 1250
+          y: 300
+        positionAbsolute:
+          x: 1250
+          y: 300
+        data:
+          desc: ''
+          selected: false
+          title: 可用率≥80%?
+          type: if-else
+          cases:
+            - case_id: 'true'
+              conditions:
+                - id: cond-rate
+                  varType: number
+                  variable_selector:
+                    - parse-report
+                    - rate
+                  comparison_operator: '>='
+                  value: '80'
+              logical_operator: and
+            - case_id: 'false'
+              conditions: []
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 126
+        selected: false
+      - id: make-video
+        position:
+          x: 1600
+          y: 150
+        positionAbsolute:
+          x: 1600
+          y: 150
+        data:
+          desc: ''
+          selected: false
+          title: 合成视频
+          type: http-request
+          method: post
+          url: '{{#env.API_BASE#}}/video/{{#start.product_id#}}'
+          headers: ''
+          params: ''
+          body:
+            type: none
+            data: []
+          authorization:
+            type: no-auth
+            config: null
+          timeout: 3600000
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 120
+        selected: false
+      - id: llm-advice
+        position:
+          x: 1600
+          y: 470
+        positionAbsolute:
+          x: 1600
+          y: 470
+        data:
+          desc: ''
+          selected: false
+          title: Prompt优化建议
+          type: llm
+          model:
+            provider: ''
+            name: ''
+            mode: chat
+            completion_params:
+              temperature: 0.3
+          prompt_template:
+            - role: system
+              text: 你是AI生图质检专家。图片可用率低于80%，最高频问题是：{{#parse-report.top_issue#}}。请针对该问题给出3条具体可执行的生图Prompt修改建议，中文，每条一行，可直接替换到生图Prompt中。
+          context:
+            enabled: false
+            variable_selector: []
+          variables:
+            - variable: top_issue
+              value_selector:
+                - parse-report
+                - top_issue
+          vision:
+            enabled: false
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 98
+        selected: false
+      - id: end-video
+        position:
+          x: 1950
+          y: 150
+        positionAbsolute:
+          x: 1950
+          y: 150
+        data:
+          desc: ''
+          selected: false
+          title: 完成-视频已生成
+          type: end
+          outputs:
+            - variable: result
+              value_selector:
+                - make-video
+                - body
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 120
+        selected: false
+      - id: end-advice
+        position:
+          x: 1950
+          y: 470
+        positionAbsolute:
+          x: 1950
+          y: 470
+        data:
+          desc: ''
+          selected: false
+          title: 完成-优化建议
+          type: end
+          outputs:
+            - variable: advice
+              value_selector:
+                - llm-advice
+                - text
+            - variable: rate
+              value_selector:
+                - parse-report
+                - rate
+            - variable: top_issue
+              value_selector:
+                - parse-report
+                - top_issue
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        width: 244
+        height: 120
+        selected: false
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7
