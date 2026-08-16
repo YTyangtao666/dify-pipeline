@@ -3,7 +3,8 @@
 set -u
 
 DIFY_BASE="http://127.0.0.1/v1"
-DIFY_API_KEY="REMOVED-LEAKED-KEY"
+# API key 从 .env 读取（勿硬编码入库）
+set -a; source "$(cd "$(dirname "$0")/.." && pwd)/.env"; set +a
 PRODUCT_ID="${1:-P001}"
 
 resp=$(curl -sS --max-time 7200 -X POST "$DIFY_BASE/workflows/run" -H "Authorization: Bearer $DIFY_API_KEY" -H "Content-Type: application/json" -d "{\"inputs\":{\"product_id\":\"$PRODUCT_ID\",\"gen_limit\":2},\"response_mode\":\"blocking\",\"user\":\"cron\"}")
