@@ -58,6 +58,16 @@ def video(pid: str, script_category: str | None = None):
     return run(cmd)
 
 
+@app.post("/import-results/{pid}")  # L10 导入投放数据（body: {"file": "data/ads.csv"}）
+def import_results(pid: str, file: str):
+    return run([PY, "scripts/07_import_results.py", "--product", pid, "--file", file])
+
+
+@app.post("/iterate/{pid}")        # L11 归因迭代 → 框架库 score 回流
+def iterate(pid: str):
+    return run([PY, "scripts/08_iterate.py", "--product", pid], timeout=600)
+
+
 @app.get("/report")            # 读取最新评分报告（Dify 条件分支取数用）
 def report():
     f = ROOT / "output/eval/eval_report.json"
