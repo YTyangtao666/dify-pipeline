@@ -42,6 +42,14 @@ def evaluate():
     return run([PY, "scripts/03_eval_images.py"])
 
 
+@app.post("/analyze/{pid}")    # 05 前八层分析链（L1产品→L2竞品→L6反馈→L7排序→L8brief）
+def analyze(pid: str, full: bool = True):
+    cmd = [PY, "scripts/05_analyze.py", "--product", pid]
+    if not full:
+        cmd += ["--no-competitor", "--no-feedback"]
+    return run(cmd, timeout=1200)
+
+
 @app.post("/video/{pid}")      # 04 视频（script_category 可选：脚本库分类驱动口播）
 def video(pid: str, script_category: str | None = None):
     cmd = [PY, "scripts/04_make_video.py", "--product", pid]
