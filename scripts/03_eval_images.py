@@ -23,9 +23,24 @@ def load_title_map(products_file: Path) -> dict[str, str]:
     return {p["product_id"]: p.get("title", "") for p in products}
 
 
+def load_top3_map(data_dir: Path) -> dict[str, dict]:
+    """L7 联动：读 selling_points_{pid}.json，有则升级为「打穿Top3」质检标准。"""
+    mapping = {}
+    for f in data_dir.glob("selling_points_*.json"):
+        try:
+            pid = f.stem[len("selling_points_"):]  # 防多下划线错位
+            table = json.loads(f.read_text(encoding="utf-8"))
+            if table.get("top3"):
+                mapping[pid] = table
+        except Exception:  # noqa: BLE001
+            continue
+    return mapping
+
+
 async def run(images_dir: Path, out_dir: Path, products_file: Path) -> dict:
     cfg = Config.from_env()
     titles = load_title_map(products_file)
+    top3_map = load_top3_map(products_file.parent)  # data/ 下找 selling_points_*.json
     out_dir.mkdir(parents=True, exist_ok=True)
 
     images = sorted(
@@ -52,11 +67,15 @@ async def run(images_dir: Path, out_dir: Path, products_file: Path) -> dict:
             title = titles.get(pid, pid)
             verdicts = []
             for i, img in enumerate(imgs):
-                v = await evaluator.evaluate_image(cfg, img, title, client=client)
+                v = await evaluator.evaluate_image(cfg, img, title, client=client,
+                                                   top3_table=top3_map.get(pid))
                 all_verdicts.append(v)
                 verdicts.append(v)
-                mark = "✓" if v.usable else "✗"
-                print(f"  {mark} {img.name} score={v.score} issues={[i.get('type') for i in v.issues]}")
+                marks = "✓" if v.usable else "✗"
+                hits = sum(1 for h in v.top3_hits if isinstance(h, dict) and h.get("hit"))
+                hit_s = f" Top3打穿{hits}/{len(v.top3_hits)}" if v.top3_hits else ""
+                print(f"  {marks} {img.name} score={v.score}{hit_s} "
+                      f"issues={[i.get('type') for i in v.issues]}")
             reports[pid] = evaluator.build_report(verdicts)
     finally:
         await client.aclose()

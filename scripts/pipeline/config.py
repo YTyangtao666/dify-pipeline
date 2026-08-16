@@ -20,6 +20,12 @@ class Config:
     proxy: str | None = None
     out_dir: Path = field(default_factory=lambda: Path("output"))
     tts_voice: str = "zh-CN-XiaoxiaoNeural"
+    # VLM 兜底端点（主端点 403 配额耗尽时切换，如智谱 glm-4v-flash 免费）
+    vlm_fallback_url: str | None = None
+    vlm_fallback_key: str | None = None
+    vlm_fallback_model: str | None = None
+    vlm_fallback_proxy: str | None = None
+    eval_votes: int = 1  # VLM 判定投票数（>1 启用多数决，抗概率性输出）
 
     @property
     def images_dir(self) -> Path:
@@ -52,4 +58,9 @@ class Config:
             proxy=os.environ.get("ARK_PROXY") or None,
             tts_voice=os.environ.get("TTS_VOICE", "zh-CN-XiaoxiaoNeural"),
             out_dir=out_dir,
+            vlm_fallback_url=os.environ.get("VLM_FALLBACK_URL") or None,
+            vlm_fallback_key=os.environ.get("VLM_FALLBACK_KEY") or None,
+            vlm_fallback_model=os.environ.get("VLM_FALLBACK_MODEL") or None,
+            vlm_fallback_proxy=os.environ.get("VLM_FALLBACK_PROXY") or None,
+            eval_votes=int(os.environ.get("EVAL_VOTES", "1") or 1),
         )
