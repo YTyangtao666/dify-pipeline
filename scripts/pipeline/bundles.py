@@ -69,6 +69,22 @@ BUNDLES: dict[str, dict] = {
              "uses": ["white"], "inject_top3": 2},
         ],
     },
+    "shein_launch": {
+        "name": "SHEIN上架包（8张）",
+        "desc": "女装跨境全套：AI试穿×2 + 街拍 + 平铺搭配 + 色卡 + 面料 + 尺码 + 场景",
+        "slots": [
+            {"pos": 1, "role": "试穿主图", "preset": "ai_tryon", "size": "3:4", "uses": ["flat", "model"]},
+            {"pos": 2, "role": "试穿街拍", "preset": "ai_tryon_street", "size": "3:4", "uses": ["flat", "model"]},
+            {"pos": 3, "role": "平铺搭配", "preset": "flat_lay", "size": "1:1", "uses": ["flat"]},
+            {"pos": 4, "role": "SKU色卡", "preset": "color_swatch", "size": "1:1", "uses": ["flat"]},
+            {"pos": 5, "role": "面料细节", "preset": "detail_fabric", "size": "1:1", "uses": ["flat"]},
+            {"pos": 6, "role": "尺码指南", "preset": "size_chart", "size": "3:4", "uses": ["flat"]},
+            {"pos": 7, "role": "场景种草", "preset": "ai_tryon", "size": "3:4", "uses": ["flat", "model"],
+             "market": "us"},
+            {"pos": 8, "role": "中东市场", "preset": "ai_tryon", "size": "3:4", "uses": ["flat", "model"],
+             "market": "me"},
+        ],
+    },
     "full_launch": {
         "name": "全量上架包（11张）",
         "desc": "tmall_main5 + xhs_pack6 组合，一次跑齐",
@@ -119,10 +135,11 @@ class BundlePlan:
 def _assets_of(pid: str, assets_dir: Path) -> dict[str, list[Path]]:
     d = assets_dir / pid
     if not d.exists():
-        return {"white": [], "model": []}
+        return {"white": [], "model": [], "flat": []}
     return {
         "white": sorted(d.glob("white_*")),
         "model": sorted(d.glob("model_*")),
+        "flat": sorted(d.glob("flat_*")),
     }
 
 
@@ -144,8 +161,9 @@ def plan_bundle(pid: str, bundle_id: str, *, assets_dir: Path,
                 fname = f"{pid}_main{s['pos']}_{s['role']}{vname}.png"
             runnable = not missing
             reason = ""
+            names = {"white": "白底图", "model": "模特图", "flat": "平铺图"}
             if not runnable:
-                need = "、".join("白底图" if k == "white" else "模特图" for k in missing)
+                need = "、".join(names.get(k, k) for k in missing)
                 reason = f"缺少{need}"
             slots.append(SlotPlan(pos=s["pos"], role=s["role"], preset=s["preset"],
                                   size=s["size"], filename=fname, runnable=runnable,

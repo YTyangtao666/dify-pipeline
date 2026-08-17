@@ -93,18 +93,38 @@ async def _gen_with_client(cfg: Config, plan: BundlePlan, slot, out_path: Path) 
 
 
 def _slot_refs(plan: BundlePlan, slot):
-    """槽位参考图：白底图必带；uses 含 model 且素材在时带上。"""
+    """槽位参考图：按 uses 取素材（white/flat/model），按 preset 声明顺序。"""
     from .bundles import get_bundle
+    from . import compose as compose_lib
     b = get_bundle(plan.bundle_id)
     slot_def = next((s for s in b["slots"] if s["pos"] == slot.pos and s["role"] == slot.role), None)
+    # uses 来源：bundle slot 定义 > fashion/compose 预设声明
+    uses = (slot_def or {}).get("uses") or _preset_uses(slot.preset)
     assets_dir = Path("data/assets")
     d = assets_dir / plan.product_id
-    whites = sorted(d.glob("white_*")) if d.exists() else []
-    models = sorted(d.glob("model_*")) if d.exists() else []
-    refs = whites[:1]
-    if slot_def and "model" in slot_def.get("uses", []) and models:
-        refs = refs + models[:1]
+    pool = {}
+    if d.exists():
+        for kind in ("white", "flat", "model"):
+            pool[kind] = sorted(d.glob(f"{kind}_*"))
+    refs = []
+    for kind in uses:
+        if pool.get(kind):
+            refs.append(pool[kind][0])
     return refs
+
+
+def _preset_uses(preset_id: str) -> list[str]:
+    """从 fashion/compose 预设反查 uses。"""
+    from . import compose as compose_lib
+    for lib in (fashion_lib(), compose_lib):
+        if preset_id in getattr(lib, "PRESETS", {}):
+            return lib.PRESETS[preset_id].get("uses", ["white"])
+    return ["white"]
+
+
+def fashion_lib():
+    from . import fashion
+    return fashion
 
 
 def _build_slot_prompt(plan: BundlePlan, slot, compose_lib) -> str:
@@ -131,10 +151,10 @@ def _build_slot_prompt(plan: BundlePlan, slot, compose_lib) -> str:
             pass
     # AB 钩子注入：hook 文案里的 {pain}/{benefit} 用 Top3 数据替换
     pts = top3 or None
+    from .bundles import get_bundle
+    b = get_bundle(plan.bundle_id)
+    slot_def = next((s for s in b["slots"] if s["pos"] == slot.pos and s["role"] == slot.role), {})
     if slot.hook and top3:
-        from .bundles import get_bundle
-        b = get_bundle(plan.bundle_id)
-        slot_def = next((s for s in b["slots"] if s["pos"] == slot.pos and s["role"] == slot.role), {})
         sp2 = root / "data" / f"selling_points_{plan.product_id}.json"
         try:
             table = _json.loads(sp2.read_text(encoding="utf-8"))
@@ -145,7 +165,17 @@ def _build_slot_prompt(plan: BundlePlan, slot, compose_lib) -> str:
         hook = slot_def.get("hook", "").replace("{pain}", pain[:12]).replace("{benefit}", point[:10])
     else:
         hook = slot.hook
-    prompt = compose_lib.build_prompt(slot.preset, title=title, top3_points=pts)
+    from . import fashion as fashion_lib
+    if slot.preset in fashion_lib.FASHION_PRESETS:
+        # 女装预设：market 变体优先
+        market = (slot_def or {}).get("market") if slot_def else None
+        if market and market in fashion_lib.MARKET_VARIANTS:
+            prompt = fashion_lib.build_market_prompt(slot.preset, market=market,
+                                                      title=title, top3_points=pts)
+        else:
+            prompt = fashion_lib.build_fashion_prompt(slot.preset, title=title, top3_points=pts)
+    else:
+        prompt = compose_lib.build_prompt(slot.preset, title=title, top3_points=pts)
     if hook:
         prompt = f"画面氛围钩子：{hook}。{prompt}"
     return prompt
