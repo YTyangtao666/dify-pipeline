@@ -41,18 +41,29 @@ def run_bundle(plan: BundlePlan, *, out_dir: Path,
     skipped = 0
     t0 = time.time()
 
-    # 两段式：先生成「商品标准特写」——以平铺/白底图为参考、最强商品约束、
-    # 只生成一次；后续所有槽位将其注入参考图首位，商品颜色/印花向同一张图收敛。
-    anchor_name = f"{plan.product_id}_00_商品标准特写.png"
-    anchor_path = out_dir / anchor_name
-    if plan.bundle_id.startswith("skill_") and not anchor_path.exists():
-        try:
-            asyncio.run(_gen_product_anchor(cfg, plan, anchor_path))
-            generated.append(str(anchor_path))
-            print(f"  ✓ [00] 商品标准特写 → {anchor_name}")
-        except Exception as e:  # noqa: BLE001
-            print(f"  ! [00] 商品标准特写失败(不阻塞槽位): {str(e)[:120]}")
-            anchor_path = None
+    # 三段式双锚定：00A 商品标准特写（商品锚）+ 00B 模特三视图（模特锚）。
+    # 00A: 以平铺图为参考、最强商品约束、只生成一次，商品颜色/印花向同一张图收敛。
+    # 00B: 模特穿该商品的正/侧/背三视图——单图同时锁「人+货」绑定关系。
+    anchor_a = out_dir / f"{plan.product_id}_00A_商品标准特写.png"
+    anchor_b = out_dir / f"{plan.product_id}_00B_模特三视图.png"
+    has_model_asset = _has_model_asset(plan.product_id)
+    if plan.bundle_id.startswith("skill_"):
+        if not anchor_a.exists():
+            try:
+                asyncio.run(_gen_product_anchor(cfg, plan, anchor_a))
+                generated.append(str(anchor_a))
+                print(f"  ✓ [00A] 商品标准特写 → {anchor_a.name}")
+            except Exception as e:  # noqa: BLE001
+                print(f"  ! [00A] 商品标准特写失败(不阻塞槽位): {str(e)[:120]}")
+                anchor_a = None
+        if has_model_asset and not anchor_b.exists():
+            try:
+                asyncio.run(_gen_model_sheet(cfg, plan, anchor_b, anchor_a))
+                generated.append(str(anchor_b))
+                print(f"  ✓ [00B] 模特三视图 → {anchor_b.name}")
+            except Exception as e:  # noqa: BLE001
+                print(f"  ! [00B] 模特三视图失败(不阻塞槽位): {str(e)[:120]}")
+                anchor_b = None
 
     for slot in plan.slots:
         if not slot.runnable:
@@ -64,7 +75,8 @@ def run_bundle(plan: BundlePlan, *, out_dir: Path,
             pass  # 正常模式不读旧 manifest，直接生成
         out_path = out_dir / slot.filename
         try:
-            r = asyncio.run(_gen_with_client(cfg, plan, slot, out_path, anchor=anchor_path))
+            r = asyncio.run(_gen_with_client(cfg, plan, slot, out_path,
+                                              anchor_a=anchor_a, anchor_b=anchor_b))
             generated.append(str(out_path))
             print(f"  ✓ [{slot.pos}] {slot.role} → {slot.filename}")
             if on_progress:
@@ -95,16 +107,92 @@ def run_bundle(plan: BundlePlan, *, out_dir: Path,
 
 
 async def _gen_with_client(cfg: Config, plan: BundlePlan, slot, out_path: Path, *,
-                           anchor: Path | None = None) -> GenResult:
+                           anchor_a: Path | None = None,
+                           anchor_b: Path | None = None) -> GenResult:
     """单槽位生成：独立事件循环内的 client 生命周期（避免跨 loop 复用）。"""
     from . import compose as compose_lib
     prompt = _build_slot_prompt(plan, slot, compose_lib)
     refs = _slot_refs(plan, slot)
-    if anchor is not None and anchor.exists():
-        refs = [anchor] + refs
+    uses_model = _slot_uses_model(plan, slot)
+    if uses_model and anchor_a is not None and anchor_a.exists() \
+            and anchor_b is not None and anchor_b.exists():
+        # 模特槽位：双锚注入——[商品锚, 模特锚]，恰好两张、按位置声明职责
+        refs = [anchor_a, anchor_b]
+    elif anchor_a is not None and anchor_a.exists():
+        # 商品槽位/降级：只注入商品锚
+        refs = [anchor_a] + refs
     async with build_client(cfg) as client:
         return await generate_image(cfg, prompt, out_path,
                                     size=slot.size, interval=1.0,
+                                    client=client, reference_images=refs)
+
+
+def _has_model_asset(pid: str) -> bool:
+    d = Path("data/assets") / pid
+    if not d.exists():
+        return False
+    return bool(list(d.glob("model_*")) or list(d.glob("onbody_*")))
+
+
+def _slot_uses_model(plan: BundlePlan, slot) -> bool:
+    """槽位是否使用模特素材（uses 含 model）。"""
+    import json as _json
+    from .bundles import get_bundle
+    if plan.bundle_id.startswith("skill_"):
+        skill_id = plan.bundle_id[len("skill_"):]
+        pack_f = Path(__file__).resolve().parent.parent.parent / "data" / "skills" / f"{skill_id}.json"
+        try:
+            pack = _json.loads(pack_f.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            pack = None
+        if pack is not None:
+            slot_def = next((s for s in pack["slots"] if s["pos"] == slot.pos), None)
+            return bool(slot_def and "model" in (slot_def.get("input_deps") or []))
+    # 技能包不可读时回退：参考图池里是否有模特素材注入
+    refs = _slot_refs(plan, slot)
+    return any(("model_" in str(r) or "onbody_" in str(r)) for r in refs)
+    b = get_bundle(plan.bundle_id)
+    slot_def = next((s for s in b["slots"] if s["pos"] == slot.pos and s["role"] == slot.role), None)
+    return bool(slot_def and "model" in (slot_def.get("uses") or []))
+
+
+async def _gen_model_sheet(cfg: Config, plan: BundlePlan, out_path: Path,
+                           anchor_a: Path | None) -> GenResult:
+    """模特三视图：模特穿着该商品的正/侧/背三视图并排，纯白背景。
+    单图同时锁「人+货」绑定：面部/发型/肤色/身材跟 model 素材，服装跟商品锚/平铺图。"""
+    assets_dir = Path("data/assets") / plan.product_id
+    model_ref = None
+    for kind in ("model", "onbody"):
+        pool = sorted(assets_dir.glob(f"{kind}_*")) if assets_dir.exists() else []
+        if pool:
+            model_ref = pool[0]
+            break
+    if model_ref is None:
+        raise FileNotFoundError("无模特素材, 跳过三视图")
+    flat_ref = None
+    for kind in ("flat", "white"):
+        pool = sorted(assets_dir.glob(f"{kind}_*")) if assets_dir.exists() else []
+        if pool:
+            flat_ref = pool[0]
+            break
+    prompt = (
+        "服装模特三视图设定图，纯白摄影棚背景，单张图横排三个全身像："
+        "左=正面、中=侧面、右=背面。"
+        "第一张参考图是模特原始照片：三个视图的模特面部、五官、发型发色、肤色、身材比例"
+        "必须与之 100% 一致——同一个人，严禁换人/换人种/改发型。"
+        "模特穿着指定商品服装：服装的颜色、印花图案、印花文字与字体颜色、版型、衣长、袖型"
+        "与商品参考图逐项完全复刻，印花文字逐字母一致，严禁添加不存在的图案或装饰。"
+        "三视图姿态：自然直立、双臂自然下垂、面部中性表情、不遮挡服装。"
+        "真实摄影质感，胶片颗粒感，禁止塑料感皮肤与 AI 精修感。"
+    )
+    refs = [model_ref]
+    if anchor_a is not None and anchor_a.exists():
+        refs.append(anchor_a)
+    elif flat_ref is not None:
+        refs.append(flat_ref)
+    async with build_client(cfg) as client:
+        return await generate_image(cfg, prompt, out_path,
+                                    size="4:3", interval=1.0,
                                     client=client, reference_images=refs)
 
 

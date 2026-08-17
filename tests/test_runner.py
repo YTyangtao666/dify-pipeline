@@ -137,11 +137,58 @@ def test_product_anchor_generated_first_and_injected(tmp_path, monkeypatch):
     plan = BundlePlan(bundle_id="skill_s1", product_id="P1", slots=slots)
     manifest = runner.run_bundle(plan, out_dir=tmp_path)
 
-    assert manifest["summary"]["ok"] == 3  # 1 特写 + 2 槽位
+    assert manifest["summary"]["ok"] == 4  # 00A 商品锚 + 00B 模特三视图 + 2 槽位
     first = calls[0]
     assert "商品标准特写" in first["prompt"] or "标准特写" in first["prompt"]
     assert first["refs"] and any("flat_1.png" in r for r in first["refs"])
-    # 后续槽位: 特写图必须是参考图第一位
-    assert calls[1]["refs"][0].endswith("P1_00_商品标准特写.png")
-    assert calls[2]["refs"][0].endswith("P1_00_商品标准特写.png")
-    assert (tmp_path / "P1_00_商品标准特写.png").exists()
+    # 00B 三视图: 参考=model原图+商品锚
+    assert any("model_1.png" in r for r in calls[1]["refs"])
+    assert calls[1]["refs"][-1].endswith("P1_00A_商品标准特写.png")
+    # 槽位: 商品锚第一位
+    assert calls[2]["refs"][0].endswith("P1_00A_商品标准特写.png")
+    assert calls[3]["refs"][0].endswith("P1_00A_商品标准特写.png")
+    assert (tmp_path / "P1_00A_商品标准特写.png").exists()
+    assert (tmp_path / "P1_00B_模特三视图.png").exists()
+
+
+def test_model_sheet_generated_and_injected(tmp_path, monkeypatch):
+    """双锚定：先出商品特写+模特三视图，模特槽位注入双锚，商品槽位只注入商品锚。"""
+    from scripts.pipeline import runner
+    from scripts.pipeline.bundles import BundlePlan, SlotPlan
+
+    calls = []
+
+    async def fake_gen(cfg, prompt, out_path, **kw):
+        calls.append({"prompt": prompt,
+                      "refs": [str(r) for r in kw.get("reference_images", [])],
+                      "out": str(out_path)})
+        out_path.write_bytes(b"x")
+        return None
+
+    monkeypatch.setattr(runner, "generate_image", fake_gen)
+    monkeypatch.setattr(runner, "_slot_refs", lambda plan, slot: ["/tmp/flat_1.png", "/tmp/model_1.png"])
+    monkeypatch.setattr(runner, "_build_slot_prompt", lambda plan, slot, cl: f"prompt-{slot.pos}")
+    from pathlib import Path as _Path
+    assets = _Path.cwd() / "data" / "assets" / "P1"
+    assets.mkdir(parents=True, exist_ok=True)
+    (assets / "flat_1.png").write_bytes(b"x")
+    (assets / "model_1.png").write_bytes(b"x")
+
+    slots = [SlotPlan(pos=1, role="街拍图", preset="skill:s1:1", size="3:4",
+                      filename="P1_01_街拍图.png", runnable=True),   # uses含model
+             SlotPlan(pos=3, role="白底单品图", preset="skill:s1:3", size="3:4",
+                      filename="P1_03_白底单品图.png", runnable=True)]  # 纯商品
+    plan = BundlePlan(bundle_id="skill_s1", product_id="P1", slots=slots)
+    manifest = runner.run_bundle(plan, out_dir=tmp_path)
+
+    assert manifest["summary"]["ok"] == 4  # 00A + 00B + 2槽位
+    anchor_a, anchor_b = calls[0], calls[1]
+    assert "商品标准特写" in anchor_a["prompt"]
+    assert "三视图" in anchor_b["prompt"] and "正" in anchor_b["prompt"] and "背" in anchor_b["prompt"]
+    # 三视图参考: model原图 + 商品锚
+    assert any("model_1.png" in r for r in anchor_b["refs"])
+    assert any("00A" in r for r in anchor_b["refs"])
+    # 模特槽位: 双锚[00A, 00B]
+    assert "00A" in calls[2]["refs"][0] and "00B" in calls[2]["refs"][1]
+    # 商品槽位: 只注入商品锚
+    assert "00A" in calls[3]["refs"][0] and "00B" not in calls[3]["refs"]
