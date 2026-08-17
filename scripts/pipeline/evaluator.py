@@ -195,7 +195,9 @@ async def _evaluate_with(cfg: Config, image_path: Path, product_title: str, *,
                 {"type": "text", "text": eval_prompt},
             ],
         }],
-        "max_tokens": 800,
+        "max_tokens": 2000,  # gemini 类模型 800 会截断 JSON 输出
+        "temperature": 0,    # 质检要确定性
+        "stream": False,     # 显式阻塞模式：部分网关(apimart等)默认 SSE，需显式关掉
     }
 
     own = False
@@ -217,7 +219,16 @@ async def _evaluate_with(cfg: Config, image_path: Path, product_title: str, *,
                     await client.aclose()
                 return None  # 配额耗尽：交上层切换
             if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"].get("content") or ""
+                try:
+                    body = resp.json()
+                    content = body["choices"][0]["message"].get("content") or ""
+                except (ValueError, KeyError, IndexError, AttributeError) as e:
+                    # 200 但 body 非 JSON（网关空响应/HTML）——按可重试错误处理
+                    last_err = f"200 但响应体异常: {str(e)[:80]} body={resp.text[:80]!r}"
+                    if attempt < RETRY_MAX:
+                        await asyncio.sleep(BACKOFF_BASE ** (attempt + 1))
+                        continue
+                    break
                 data = extract_json(content)
                 if data is None:
                     last_err = "unparsable VLM output"

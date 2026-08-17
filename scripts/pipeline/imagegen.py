@@ -42,8 +42,10 @@ async def generate_image(
     size: str = "1024x1024",
     interval: float = 1.0,
     client: httpx.AsyncClient | None = None,
+    poll_interval: float = 3.0,
+    poll_timeout: float = 300.0,
 ) -> GenResult:
-    """生成单张图并落盘。兼容 url / b64_json 两种返回。"""
+    """生成单张图并落盘。兼容三种返回：b64_json / url（同步）与 task_id（异步轮询）。"""
     global _last_request_ts
 
     own = client is None
@@ -61,8 +63,13 @@ async def generate_image(
     for attempt in range(RETRY_MAX + 1):
         resp = await client.post("/images/generations", json=payload)
         if resp.status_code == 200:
-            data = resp.json()["data"][0]
-            return await _save(cfg, data, out_path, client)
+            body = resp.json()
+            first = (body.get("data") or [{}])[0]
+            task_id = first.get("task_id")
+            if task_id:
+                return await _poll_task(cfg, task_id, out_path, client,
+                                        poll_interval, poll_timeout)
+            return await _save(cfg, first, out_path, client)
         last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
         if resp.status_code in (429, 500, 502, 503, 504) and attempt < RETRY_MAX:
             await asyncio.sleep(BACKOFF_BASE ** (attempt + 1))
@@ -95,3 +102,38 @@ async def _save(cfg: Config, item: dict, out_path: Path, client: httpx.AsyncClie
         out_path.write_bytes(dl.content)
         return GenResult(path=out_path, remote_url=url)
     raise RuntimeError(f"生图返回里既无 b64_json 也无 url: {str(item)[:200]}")
+
+
+POLL_TERMINAL = ("completed", "failed")
+
+
+async def _poll_task(
+    cfg: Config,
+    task_id: str,
+    out_path: Path,
+    client: httpx.AsyncClient,
+    poll_interval: float,
+    poll_timeout: float,
+) -> GenResult:
+    """apimart 异步任务模式：GET /tasks/{id} 轮询到 completed → 取 images[0].url[0] 下载落盘。"""
+    import asyncio as _aio
+
+    t0 = time.monotonic()
+    while True:
+        resp = await client.get(f"/tasks/{task_id}")
+        body = resp.json().get("data", {})
+        status = body.get("status", "")
+        if status == "completed":
+            urls = body["result"]["images"][0]["url"]
+            url = urls[0] if isinstance(urls, list) else urls
+            dl = await client.get(url)
+            dl.raise_for_status()
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(dl.content)
+            return GenResult(path=out_path, remote_url=url)
+        if status == "failed":
+            msg = (body.get("error") or {}).get("message", "unknown")
+            raise RuntimeError(f"生图任务失败: {msg}")
+        if time.monotonic() - t0 > poll_timeout:
+            raise RuntimeError(f"生图任务轮询超时({poll_timeout}s): {task_id} status={status}")
+        await _aio.sleep(poll_interval)
