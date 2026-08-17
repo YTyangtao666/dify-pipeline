@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI电商图工坊 · 图生图</title>
+<style>
+:root{
+  --bg:#faf8f5; --card:#ffffff; --gold:#c9a86a; --gold-d:#a8894e;
+  --ink:#2c2824; --sub:#8a8378; --ok:#4a9d6f; --bad:#c96a6a; --line:#eee8df;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC",sans-serif;padding:32px 20px}
+.wrap{max-width:1080px;margin:0 auto}
+h1{font-size:26px;font-weight:700;letter-spacing:1px}
+h1 span{color:var(--gold)}
+.sub{color:var(--sub);margin:8px 0 28px;font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.card h2{font-size:16px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--sub);cursor:pointer;transition:.2s;font-size:14px}
+.drop.on{border-color:var(--gold);background:#fdf9f0}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.thumbs img{width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.pids{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.pid{padding:6px 16px;border:1px solid var(--line);border-radius:20px;cursor:pointer;font-size:14px;background:var(--card)}
+.pid.on{border-color:var(--gold);color:var(--gold-d);background:#fdf9f0;font-weight:600}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.preset{border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;transition:.15s}
+.preset.on{border-color:var(--gold);background:#fdf9f0}
+.preset b{font-size:14px;display:block}
+.preset i{font-size:12px;color:var(--sub);font-style:normal}
+.preset .need{font-size:11px;color:var(--gold-d);margin-top:4px;display:inline-block}
+.go{margin-top:26px;width:100%;padding:16px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--gold),var(--gold-d));color:#fff;font-size:17px;font-weight:600;letter-spacing:2px;cursor:pointer;transition:.2s}
+.go:disabled{opacity:.45;cursor:not-allowed}
+.go:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(201,168,106,.35)}
+.log{margin-top:18px;background:#2c2824;color:#d9d2c7;border-radius:10px;padding:16px;font:12px/1.8 Menlo,monospace;max-height:220px;overflow:auto;white-space:pre-wrap;display:none}
+.results{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:18px}
+.shot{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.shot img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.shot .m{padding:10px 12px;font-size:13px;display:flex;justify-content:space-between}
+.score{font-weight:700}
+.score.g{color:var(--ok)} .score.b{color:var(--bad)}
+#bar{height:6px;background:var(--line);border-radius:3px;margin-top:14px;overflow:hidden;display:none}
+#bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-d));transition:width .4s}
+.hint{font-size:12px;color:var(--sub);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI电商图工坊 <span>·</span> 图生图</h1>
+  <p class="sub">上传商品白底图（和模特图）→ 选构图 → 一键生成。gpt-image-2 保证商品外观与原图一致。</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2><i class="dot"></i>第一步 · 上传素材</h2>
+      <div class="drop" id="dropW">拖拽或点击上传 <b>白底图</b>（必需）</div>
+      <div class="thumbs" id="thW"></div>
+      <div style="height:14px"></div>
+      <div class="drop" id="dropM">拖拽或点击上传 <b>模特图</b>（选配，模特手持图需要）</div>
+      <div class="thumbs" id="thM"></div>
+      <input type="file" id="fW" accept="image/png,image/jpeg,image/webp" hidden multiple>
+      <input type="file" id="fM" accept="image/png,image/jpeg,image/webp" hidden multiple>
+      <p class="hint">存到 data/assets/{商品}/，同名类型自动编号。上传的原图永远保留。</p>
+    </div>
+
+    <div class="card">
+      <h2><i class="dot"></i>第二步 · 选商品与构图</h2>
+      <div class="pids" id="pids"></div>
+      <div class="presets" id="presets"></div>
+    </div>
+  </div>
+
+  <button class="go" id="go" disabled>⚡ 开始生成（每张约 30-60 秒）</button>
+  <div id="bar"><i></i></div>
+  <div class="log" id="log"></div>
+  <div class="results" id="results"></div>
+</div>
+
+<script>
+const API = "http://127.0.0.1:8100";
+let pid = null, presets = [], assets = {white:0, model:0};
+
+const $ = id => document.getElementById(id);
+const log = (s, show=true) => { const el=$("log"); el.style.display=show?"block":"none"; el.textContent += s+"\n"; el.scrollTop=el.scrollHeight; };
+
+// 商品列表
+fetch(API + "/report").catch(()=>{});
+(async () => {
+  // 用 products.json 不可行(无端点)——从 compose presets 接口顺带拉商品
+  const r = await fetch(API + "/compose/presets").then(r=>r.json()).catch(()=>null);
+  $("presets").innerHTML = (r?.presets||[]).map(p =>
+    `<div class="preset" data-id="${p.preset_id}">
+       <b>${p.name}</b><i>${p.size}</i>
+       ${p.uses.includes("model")?'<span class="need">需模特图</span>':""}
+     </div>`).join("");
+  document.querySelectorAll(".preset").forEach(el => el.onclick = () => {
+    el.classList.toggle("on");
+    presets = [...document.querySelectorAll(".preset.on")].map(e=>e.dataset.id);
+    refresh();
+  });
+  // 商品下拉：内置两个示例 + 手输
+  $("pids").innerHTML = ["P001","P002"].map(p =>
+    `<span class="pid" data-p="${p}">${p}</span>`).join("") +
+    `<span class="pid" data-p="__custom">+ 手输ID</span>`;
+  document.querySelectorAll(".pid").forEach(el => el.onclick = () => {
+    if (el.dataset.p === "__custom") {
+      const v = prompt("输入商品ID（须已存在于 data/products.json）");
+      if (!v) return;
+      el.dataset.p = v; el.textContent = v;
+    }
+    document.querySelectorAll(".pid").forEach(e=>e.classList.remove("on"));
+    el.classList.add("on"); pid = el.dataset.p; loadAssets(); refresh();
+  });
+})();
+
+async function loadAssets(){
+  assets = await fetch(`${API}/assets/${pid}`).then(r=>r.json()).catch(()=>({white:0,model:0}));
+  log(`[${pid}] 现有素材: 白底图×${assets.white} 模特图×${assets.model}`);
+}
+
+// 上传（拖拽+点击）
+function bindDrop(dropId, inputId, kind, thumbId){
+  const d=$(dropId), inp=$(inputId);
+  d.onclick=()=>inp.click();
+  d.ondragover=e=>{e.preventDefault();d.classList.add("on")};
+  d.ondragleave=()=>d.classList.remove("on");
+  d.ondrop=e=>{e.preventDefault();d.classList.remove("on");up(kind,e.dataTransfer.files,thumbId)};
+  inp.onchange=()=>up(kind,inp.files,thumbId);
+}
+async function up(kind, files, thumbId){
+  if(!pid){alert("先选商品ID");return}
+  for (const f of files){
+    const fd=new FormData(); fd.append("file",f);
+    const r=await fetch(`${API}/assets/${pid}/${kind}`,{method:"POST",body:fd}).then(r=>r.json()).catch(e=>({error:String(e)}));
+    if(r.ok){ $(thumbId).innerHTML += `<img src="${URL.createObjectURL(f)}">`; log(`✓ ${kind} 上传: ${r.path}`); }
+    else log(`✗ ${kind} 失败: ${r.detail||r.error}`);
+  }
+  loadAssets(); refresh();
+}
+bindDrop("dropW","fW","white","thW");
+bindDrop("dropM","fM","model","thM");
+
+function refresh(){
+  $("go").disabled = !(pid && presets.length && assets.white>0);
+}
+$("go").onclick = async () => {
+  $("go").disabled = true; $("bar").style.display="block";
+  log(`\n▶ 开始组图: ${pid} × ${presets.length} 个构图`, true);
+  // 分批发（每预设单独发，好更新进度）
+  const done=[];
+  for (let i=0;i<presets.length;i++){
+    const p=presets[i];
+    $("bar i").style.width = (i/presets.length*100)+"%";
+    const r=await fetch(`${API}/generate/compose`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({product_id:pid,presets:[p]})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok && j.generated?.length){
+      done.push({preset:p, path:j.generated[0]});
+      log(`✓ ${p} → ${j.generated[0]}`);
+    } else log(`✗ ${p}: ${(j.failed?.[0]?.error)||j.detail||r.status}`);
+    // 展示
+    $("results").innerHTML = done.map(d=>
+      `<div class="shot"><img src="${API}/file?path=${encodeURIComponent(d.path)}" loading="lazy">
+       <div class="m"><span>${d.preset}</span><span class="score g">生成✓</span></div></div>`).join("");
+  }
+  $("bar i").style.width="100%";
+  log(`\n■ 完成 ${done.length}/${presets.length}。图片在 output/images/，质检待跑 03（工作流一键含质检）。`);
+  $("go").disabled=false;
+};
+</script>
+</body>
+</html>

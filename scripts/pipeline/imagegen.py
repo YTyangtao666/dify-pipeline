@@ -44,8 +44,13 @@ async def generate_image(
     client: httpx.AsyncClient | None = None,
     poll_interval: float = 3.0,
     poll_timeout: float = 300.0,
+    reference_images: list | None = None,
 ) -> GenResult:
-    """生成单张图并落盘。兼容三种返回：b64_json / url（同步）与 task_id（异步轮询）。"""
+    """生成单张图并落盘。兼容三种返回：b64_json / url（同步）与 task_id（异步轮询）。
+
+    reference_images: 图生图参考图（白底图/模特图）。元素为本地 Path/str 或 http(s) URL；
+    本地文件转 data URL，远程 URL 透传。apimart gpt-image-2 协议字段 image_urls（最多16张）。
+    """
     global _last_request_ts
 
     own = client is None
@@ -59,6 +64,8 @@ async def generate_image(
     _last_request_ts = time.monotonic()
 
     payload = {"model": cfg.image_model, "prompt": prompt, "size": size, "n": 1}
+    if reference_images:
+        payload["image_urls"] = [_to_image_url(r) for r in reference_images]
     last_err = None
     for attempt in range(RETRY_MAX + 1):
         resp = await client.post("/images/generations", json=payload)
@@ -137,3 +144,13 @@ async def _poll_task(
         if time.monotonic() - t0 > poll_timeout:
             raise RuntimeError(f"生图任务轮询超时({poll_timeout}s): {task_id} status={status}")
         await _aio.sleep(poll_interval)
+
+
+def _to_image_url(ref) -> str:
+    """参考图统一转 image_url：http(s) 透传；本地文件读盘转 data URL。"""
+    s = str(ref)
+    if s.startswith(("http://", "https://", "data:")):
+        return s
+    path = Path(s)
+    b64 = base64.b64encode(path.read_bytes()).decode()
+    return f"data:image/png;base64,{b64}"

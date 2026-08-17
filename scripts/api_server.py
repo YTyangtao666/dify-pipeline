@@ -84,6 +84,124 @@ def report():
     return json.loads(f.read_text(encoding="utf-8"))
 
 
+
+
+# ── 资产上传与一键组图（图生图） ────────────────────────────────
+import json
+import os
+from fastapi import UploadFile, File, HTTPException
+from scripts.pipeline import compose as compose_lib
+
+ASSETS_DIR = ROOT / "data" / "assets"
+ALLOWED_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+
+
+@app.post("/assets/{pid}/{kind}")  # kind: white=白底图 model=模特图
+async def upload_asset(pid: str, kind: str, file: UploadFile = File(...)):
+    if kind not in ("white", "model"):
+        raise HTTPException(400, f"kind 须为 white/model，收到 {kind}")
+    ext = ALLOWED_TYPES.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(415, f"仅支持 png/jpeg/webp，收到 {file.content_type}")
+    d = ASSETS_DIR / pid
+    d.mkdir(parents=True, exist_ok=True)
+    # 同类资产多张：white_1.png white_2.png …
+    n = len(list(d.glob(f"{kind}_*"))) + 1
+    dest = d / f"{kind}_{n}{ext}"
+    dest.write_bytes(await file.read())
+    try:
+        rel = str(dest.relative_to(ROOT))
+    except ValueError:  # 测试环境 ASSETS_DIR 在 /tmp
+        rel = str(dest)
+    return {"ok": True, "kind": kind, "path": rel, "count": n}
+
+
+@app.get("/assets/{pid}")
+def list_assets(pid: str):
+    d = ASSETS_DIR / pid
+    if not d.exists():
+        return {"white": 0, "model": 0, "files": []}
+    files = sorted(p.name for p in d.iterdir() if p.is_file())
+    return {"white": sum(1 for f in files if f.startswith("white")),
+            "model": sum(1 for f in files if f.startswith("model")),
+            "files": files}
+
+
+@app.get("/compose/presets")
+def compose_presets():
+    return {"presets": compose_lib.pick_presets(compose_lib.list_presets())}
+
+
+@app.post("/generate/compose")  # 一键组图：白底图/模特图 × 选中的构图预设
+def generate_compose(body: dict):
+    pid = body.get("product_id", "")
+    presets = body.get("presets") or []
+    d = ASSETS_DIR / pid
+    whites = sorted(d.glob("white_*")) if d.exists() else []
+    models = sorted(d.glob("model_*")) if d.exists() else []
+    if not whites:
+        return JSONResponse({"detail": f"商品 {pid} 未上传白底图，先 POST /assets/{pid}/white"},
+                            status_code=400)
+    if not presets:
+        presets = ["main_white", "scene_lifestyle", "model_hold", "detail_closeup"]
+
+    # Top3 卖点注入（L7 数据存在时）
+    top3 = []
+    sp = ROOT / "data" / f"selling_points_{pid}.json"
+    if sp.exists():
+        try:
+            top3 = [t["point"] for t in json.loads(sp.read_text(encoding="utf-8")).get("top3", [])]
+        except Exception:  # noqa: BLE001
+            pass
+    titles = {p["product_id"]: p.get("title", pid)
+              for p in json.loads((ROOT / "data" / "products.json").read_text(encoding="utf-8"))}
+    title = titles.get(pid, pid)
+
+    import asyncio
+    from scripts.pipeline import imagegen
+    from scripts.pipeline.config import Config
+    cfg = Config.from_env()
+    manifest = {"generated": [], "failed": []}
+
+    async def _gen_one(pid_preset, preset, refs, fname):
+        async with imagegen.build_client(cfg) as client:
+            return await imagegen.generate_image(
+                cfg, prompt, fname, size=preset["size"], interval=1.0,
+                client=client, reference_images=refs)
+
+    for pid_preset in presets:
+        preset = compose_lib.PRESETS.get(pid_preset)
+        if not preset:
+            manifest["failed"].append({"preset": pid_preset, "error": "未知预设"})
+            continue
+        refs = whites[:1] + (models[:1] if "model" in preset["uses"] else [])
+        prompt = compose_lib.build_prompt(pid_preset, title=title, top3_points=top3 or None)
+        fname = ROOT / "output" / "images" / f"{pid}_{pid_preset}.png"
+        try:
+            r = asyncio.run(_gen_one(pid_preset, preset, refs, fname))
+            manifest["generated"].append(str(r.path.relative_to(ROOT)))
+            print(f"  ✓ {pid_preset} ({preset['name']})")
+        except Exception as e:  # noqa: BLE001
+            manifest["failed"].append({"preset": pid_preset, "error": str(e)[:200]})
+            print(f"  ✗ {pid_preset}: {str(e)[:120]}")
+    ok = len(manifest["generated"])
+    if ok == 0:
+        return JSONResponse(manifest, status_code=502)
+    manifest["summary"] = {"ok": ok, "failed": len(manifest["failed"])}
+    return manifest
+
+
+from fastapi.responses import FileResponse
+
+
+@app.get("/file")  # 前端展示生成图（仅限 output/ 下，防穿越）
+def serve_output_file(path: str):
+    f = (ROOT / path).resolve()
+    if not str(f).startswith(str(ROOT / "output")) or not f.exists():
+        raise HTTPException(404, "not found")
+    return FileResponse(f)
+
+
 if __name__ == "__main__":
     import os
     import uvicorn
