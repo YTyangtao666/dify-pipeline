@@ -1,0 +1,545 @@
+kind: app
+version: 0.1.5
+app:
+  name: AI商品图视频流水线 v2
+  mode: workflow
+  description: 十一层编排：前八层分析(Top3红线) → 生图(mode可选) → VLM质检(可用率+Top3打穿率) → 视频合成/优化建议
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  use_icon_as_answer_icon: false
+workflow:
+  graph:
+    nodes:
+    - id: start
+      position:
+        x: 50
+        y: 300
+      positionAbsolute:
+        x: 50
+        y: 300
+      data:
+        desc: ''
+        selected: false
+        title: 开始
+        type: start
+        variables:
+        - variable: product_id
+          label: 商品ID
+          type: text-input
+          required: true
+          max_length: 48
+          options: []
+        - variable: gen_limit
+          label: 生图商品数
+          type: number
+          required: false
+          default: 2
+          options: []
+        - variable: mode
+          label: 生图模式(styles=风格 / screens=八屏)
+          type: select
+          required: false
+          options:
+          - styles
+          - screens
+          default: styles
+          max_length: 48
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 114
+      selected: false
+    - id: gen-images
+      position:
+        x: 650
+        y: 300
+      positionAbsolute:
+        x: 650
+        y: 300
+      data:
+        desc: ''
+        selected: false
+        title: 生成商品图
+        type: http-request
+        method: post
+        url: '{{#env.API_BASE#}}/generate'
+        headers: Content-Type:application/json
+        params: ''
+        body:
+          type: json
+          data: '{"limit": {{#start.gen_limit#}}, "mode": "{{#start.mode#}}"}'
+        authorization:
+          type: no-auth
+          config: null
+        max_connect_timeout: 0
+        max_read_timeout: 0
+        max_write_timeout: 0
+        variables: []
+        context:
+          enabled: false
+          variable_selector: []
+        retry_config:
+          retry_enabled: true
+          max_retries: 3
+          retry_interval: 100
+        ssl_verify: true
+        timeout:
+          connect: 60000
+          read: 3600000
+          write: 60000
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 126
+      selected: true
+    - id: eval-images
+      position:
+        x: 950
+        y: 300
+      positionAbsolute:
+        x: 950
+        y: 300
+      data:
+        desc: ''
+        selected: false
+        title: VLM质检评分
+        type: http-request
+        method: post
+        url: '{{#env.API_BASE#}}/evaluate'
+        headers: ''
+        params: ''
+        body:
+          type: none
+          data: []
+        authorization:
+          type: no-auth
+          config: null
+        max_connect_timeout: 0
+        max_read_timeout: 0
+        max_write_timeout: 0
+        variables: []
+        context:
+          enabled: false
+          variable_selector: []
+        retry_config:
+          retry_enabled: true
+          max_retries: 3
+          retry_interval: 100
+        timeout:
+          connect: 60000
+          read: 3600000
+          write: 60000
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 126
+      selected: false
+    - id: parse-report
+      position:
+        x: 1250
+        y: 300
+      positionAbsolute:
+        x: 1250
+        y: 300
+      data:
+        desc: ''
+        selected: false
+        title: 解析评分报告
+        type: code
+        code_language: python3
+        code: "def main(body: str) -> dict:\n    rate, cov, top_issue = None, None,\
+          \ \"\"\n    for line in (body or \"\").splitlines():\n        if \"总体可用率\"\
+          \ in line:\n            try:\n                rate = float(line.split(\"\
+          总体可用率\")[1].split(\"%\")[0].strip())\n            except Exception:\n  \
+          \              pass\n        if \"top3_coverage=\" in line:\n          \
+          \  v = line.split(\"top3_coverage=\")[1].strip()\n            cov = None\
+          \ if v == \"none\" else float(v.replace(\"%\", \"\"))\n        if \"top_issue=\"\
+          \ in line:\n            top_issue = line.split(\"top_issue=\")[1].strip()\n\
+          \    cov_pass = \"true\" if (cov is None or cov >= 40) else \"false\"\n\
+          \    return {\"rate\": rate if rate is not None else -1,\n            \"\
+          coverage\": cov if cov is not None else -1,\n            \"coverage_pass\"\
+          : cov_pass,\n            \"top_issue\": top_issue}"
+        variables:
+        - variable: body
+          value_selector:
+          - eval-images
+          - body
+        outputs:
+          rate:
+            children: null
+            type: number
+          coverage:
+            children: null
+            type: number
+          coverage_pass:
+            children: null
+            type: string
+          top_issue:
+            children: null
+            type: string
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 52
+      selected: false
+    - id: check-rate
+      position:
+        x: 1550
+        y: 300
+      positionAbsolute:
+        x: 1550
+        y: 300
+      data:
+        desc: ''
+        selected: false
+        title: 可用率≥80%?
+        type: if-else
+        cases:
+        - case_id: 'true'
+          logical_operator: and
+          conditions:
+          - id: cond-rate
+            varType: number
+            variable_selector:
+            - parse-report
+            - rate
+            comparison_operator: ≥
+            value: '80'
+          - id: cond-cov
+            varType: string
+            variable_selector:
+            - parse-report
+            - coverage_pass
+            comparison_operator: is
+            value: 'true'
+        - case_id: 'false'
+          conditions: []
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 148
+      selected: false
+    - id: make-video
+      position:
+        x: 1900
+        y: 150
+      positionAbsolute:
+        x: 1900
+        y: 150
+      data:
+        desc: ''
+        selected: false
+        title: 合成视频
+        type: http-request
+        method: post
+        url: '{{#env.API_BASE#}}/video/{{#start.product_id#}}'
+        headers: ''
+        params: ''
+        body:
+          type: none
+          data: []
+        authorization:
+          type: no-auth
+          config: null
+        max_connect_timeout: 0
+        max_read_timeout: 0
+        max_write_timeout: 0
+        variables: []
+        context:
+          enabled: false
+          variable_selector: []
+        retry_config:
+          retry_enabled: true
+          max_retries: 3
+          retry_interval: 100
+        timeout:
+          connect: 60000
+          read: 3600000
+          write: 60000
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 145
+      selected: false
+    - id: llm-advice
+      position:
+        x: 1900
+        y: 470
+      positionAbsolute:
+        x: 1900
+        y: 470
+      data:
+        desc: ''
+        selected: false
+        title: Prompt优化建议
+        type: llm
+        model:
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+          name: deepseek-chat
+          mode: chat
+          completion_params:
+            temperature: 0.3
+        prompt_template:
+        - role: system
+          text: 你是AI生图质检专家。图片可用率或Top3打穿率未达标，最高频问题是：{{#parse-report.top_issue#}}，Top3打穿率={{#parse-report.coverage#}}%。请针对该问题给出3条具体可执行的生图Prompt修改建议，中文，每条一行，确保下一轮生成能在画面中视觉可见地传达Top3卖点。
+        context:
+          enabled: false
+          variable_selector: []
+        variables:
+        - variable: top_issue
+          value_selector:
+          - parse-report
+          - top_issue
+        vision:
+          enabled: false
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 88
+      selected: false
+    - id: end-video
+      position:
+        x: 2250
+        y: 150
+      positionAbsolute:
+        x: 2250
+        y: 150
+      data:
+        desc: ''
+        selected: false
+        title: 完成-视频已生成
+        type: end
+        outputs:
+        - variable: result
+          value_selector:
+          - make-video
+          - body
+        - variable: coverage
+          value_selector:
+          - parse-report
+          - coverage
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 88
+      selected: false
+    - id: end-advice
+      position:
+        x: 2250
+        y: 470
+      positionAbsolute:
+        x: 2250
+        y: 470
+      data:
+        desc: ''
+        selected: false
+        title: 完成-优化建议
+        type: end
+        outputs:
+        - variable: advice
+          value_selector:
+          - llm-advice
+          - text
+        - variable: rate
+          value_selector:
+          - parse-report
+          - rate
+        - variable: top_issue
+          value_selector:
+          - parse-report
+          - top_issue
+        - variable: coverage
+          value_selector:
+          - parse-report
+          - coverage
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 140
+      selected: false
+    - id: analyze
+      position:
+        x: 350
+        y: 300
+      positionAbsolute:
+        x: 350
+        y: 300
+      data:
+        desc: ''
+        selected: false
+        title: 前八层分析链(L1→L8)
+        type: http-request
+        method: post
+        url: '{{#env.API_BASE#}}/analyze/{{#start.product_id#}}?full=false'
+        headers: Content-Type:application/json
+        params: ''
+        body:
+          type: none
+          data: []
+        authorization:
+          type: no-auth
+          config: null
+        max_connect_timeout: 0
+        max_read_timeout: 0
+        max_write_timeout: 0
+        variables: []
+        context:
+          enabled: false
+          variable_selector: []
+        retry_config:
+          retry_enabled: true
+          max_retries: 3
+          retry_interval: 100
+        ssl_verify: true
+        timeout:
+          connect: 60000
+          read: 3600000
+          write: 60000
+      type: custom
+      sourcePosition: right
+      targetPosition: left
+      width: 242
+      height: 126
+      selected: true
+    edges:
+    - id: start-analyze-target
+      source: start
+      sourceHandle: source
+      target: analyze
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: http-request
+    - id: gen-images-source-eval-images-target
+      source: gen-images
+      sourceHandle: source
+      target: eval-images
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: http-request
+    - id: eval-images-source-parse-report-target
+      source: eval-images
+      sourceHandle: source
+      target: parse-report
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+    - id: parse-report-source-check-rate-target
+      source: parse-report
+      sourceHandle: source
+      target: check-rate
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: if-else
+    - id: check-rate-true-make-video-target
+      source: check-rate
+      sourceHandle: 'true'
+      target: make-video
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: http-request
+    - id: check-rate-false-llm-advice-target
+      source: check-rate
+      sourceHandle: 'false'
+      target: llm-advice
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+    - id: make-video-source-end-video-target
+      source: make-video
+      sourceHandle: source
+      target: end-video
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: end
+    - id: llm-advice-source-end-advice-target
+      source: llm-advice
+      sourceHandle: source
+      target: end-advice
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+    - id: analyze-gen-images-target
+      source: analyze
+      sourceHandle: source
+      target: gen-images
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      selected: false
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: http-request
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7
+  features:
+    file_upload:
+      enabled: false
+  environment_variables:
+  - id: api-base-env
+    name: API_BASE
+    value: http://host.docker.internal:8100
+    value_type: string
+    selector: []
+    description: FastAPI服务地址（Dify在Docker内，宿主服务用host.docker.internal）
+  conversation_variables: []
