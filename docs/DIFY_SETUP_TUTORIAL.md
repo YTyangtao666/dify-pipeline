@@ -141,3 +141,37 @@ launchctl load ~/Library/LaunchAgents/com.sunnyworld.dify-pipeline.plist
 ## 8. 面试一句话讲清架构
 
 「我用 Dify 编排了商品营销素材生产链路：FastAPI 把 Python 生图/质检/合成脚本服务化，Dify 工作流通过 HTTP 节点串起全流程，VLM 质检评分低于 80% 时自动走 LLM 节点产出 Prompt 优化建议形成闭环，launchd 定时触发 Dify API 实现无人值守。」
+
+
+---
+
+## 7. 工作流 v2（十一层编排版，当前主推）
+
+v2 的 DSL 在 `dify/workflow_v2.yml`，由 `dify/build_v2.py` 程序化构建（改需求改脚本，别手改 yml）。
+
+### 与 v1 的区别
+
+| 节点 | v1 | v2 |
+|---|---|---|
+| 前八层分析链(L1→L8) | ❌ 无（直接生图） | ✅ 前置 analyze，产出 Top3 卖点红线 |
+| 生图模式 | 固定 styles | `mode` 可选 styles / screens（八屏视觉逼单） |
+| 质检分支 | 仅可用率≥80% | 可用率≥80% **AND** Top3打穿率≥40%（无Top3数据不卡） |
+| 「否」分支 LLM | 与生图同中转站（同生共死） | DeepSeek 官方直连（容灾） |
+| 失败语义 | 错误吞没（0张图也succeeded） | 502 透传 → 节点 retry → failed 如实上抛 |
+
+### 运行
+```
+product_id=P001, gen_limit=1, mode=styles（或 screens）
+```
+红路预期（配额未恢复时）: analyze 成功(~50-70s) → 生成商品图 failed —— 这是**正确行为**，证明失败如实暴露。
+绿路预期: 全链 succeeded，outputs 含 coverage（Top3打穿率%）。
+
+### 维护命令
+```bash
+.venv/bin/python dify/export_graph.py   # DB → dify/workflow.yml（v1 修正版回写）
+.venv/bin/python dify/build_v2.py       # v1 → dify/workflow_v2.yml（含11项断言自检）
+```
+
+### 管理凭据
+- console 账号: admin@dify-pipeline.local（密码在 macOS 钥匙串 `dify-console`）
+- cron 用的 app key: .env 的 DIFY_API_KEY（v2 app）
