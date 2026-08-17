@@ -114,9 +114,15 @@ def build_fashion_prompt(preset_id: str, *, title: str,
 
 def build_market_prompt(preset_id: str, *, market: str, title: str,
                         top3_points: list[str] | None = None) -> str:
-    """多市场变体 prompt：注入目标市场模特与场景风格。"""
+    """多市场变体 prompt：注入目标市场模特与场景风格。
+
+    注意：market 变体不复用参考模特的面部——按目标市场人种重新生成模特，
+    否则「保持模特特征」红线会压过市场指令（实测踩坑）。
+    """
     mv = MARKET_VARIANTS[market]
-    extra = f"目标市场{mv.get('name_local', mv['name'])}：模特={mv['model_brief']}；场景={mv['scene_brief']}。"
+    extra = (f"目标市场{mv.get('name_local', mv['name'])}：模特={mv['model_brief']}；"
+             f"场景={mv['scene_brief']}。模特面部不要求与参考模特一致——"
+             f"按目标市场人种重新生成；但服装款式必须与平铺参考图完全一致。")
     return build_fashion_prompt(preset_id, title=title, top3_points=top3_points,
                                 prompt_extra=extra)
 
