@@ -13,3 +13,11 @@ Dify 编排的 AI 商品营销素材生产流水线
 ### 与流水线的关系
 - 02 生图环节可从「3 风格×2 张」升级为「8 屏视觉逼单」结构（`detail_page_method.md` 的八屏任务表驱动）
 - 04 视频环节可从模板口播升级为脚本库驱动（`video_scripts_100.json` 按分类选模板，含完整分镜与提示词）
+
+
+## 🔌 API 调试端点说明
+
+| 端点 | 用途 |
+|---|---|
+| `GET /report` | 读取最新 VLM 评分报告 JSON（调试用；工作流内走 parse-report 代码节点解析 stdout，不经此端点） |
+| `POST /generate` | `mode=styles`（3风格×2张）/ `mode=screens`（八屏视觉逼单）；全失败时 exit 3 → HTTP 502（失败码透传） |
