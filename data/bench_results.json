@@ -7,512 +7,247 @@
   "results": {
     "claude-opus-4-6": [
       {
-        "qid": "OCR-E",
-        "dim": "OCR",
+        "qid": "FACE-E",
+        "dim": "人脸",
         "diff": 1,
-        "ans": "SMOKE IDON'T",
-        "ok": true,
-        "sec": 12.6,
-        "type": "auto"
+        "ans": "**同一人。** 三张照片中的女性脸型（尖下巴鹅蛋脸）、五官（大眼、高鼻梁、薄唇）、发型（棕色长卷发中分）、肤色（白皙）以及所穿的同款灰色格纹一字肩上衣和所处的同一家烘焙咖啡店场景均高度一致，明显是同一次拍摄的不同角度/构图。",
+        "ok": null,
+        "sec": 17.6,
+        "type": "human"
       },
       {
-        "qid": "OCR-M",
-        "dim": "OCR",
+        "qid": "FACE-M",
+        "dim": "人脸",
         "diff": 2,
-        "ans": "SMOKE? IDON'T",
+        "ans": "**不同人。**\n\n两人的面部特征存在明显差异——第一张图中的女生面部轮廓更圆润、五官更精致柔和，而第二张图中的女生脸型更长、下颌线条不同，且整体五官比例和气质风格有所区别。",
         "ok": true,
-        "sec": 12.4,
+        "sec": 19.7,
         "type": "auto"
       },
       {
-        "qid": "OCR-H",
-        "dim": "OCR",
+        "qid": "FACE-H",
+        "dim": "人脸",
         "diff": 3,
-        "ans": "SMOKE|IDON'T",
-        "ok": true,
+        "ans": "# 判断：不同人\n\n## 依据分析：\n\n### 面部特征差异\n\n1. **脸型**：前3张照片中的女性脸型偏圆润、短下巴，带有明显的婴儿肥感；第4张三视图模特脸型更长、更瘦削，下颌线条更分明。\n\n2. **五官比例**：前3张女性眼睛较大、圆润，鼻子小巧，嘴唇饱满，整体五官集中偏甜美；第4张模特五官更成熟、更立体，眼睛相对较细长。\n\n3. **整体气质**：前3张是甜美、可爱的少女感；第4张模特气质偏酷飒、高冷，属于不同的风格类型。\n\n### 身体特征差异\n\n4. **体型**：第4张模特身材非常纤瘦、骨感，四肢细长；前3张照片中的女性虽然也瘦，但整体看起来更柔和、有肉感。\n\n5. **发质与",
+        "ok": false,
+        "sec": 27.0,
+        "type": "auto"
+      },
+      {
+        "qid": "FACE-XM",
+        "dim": "人脸",
+        "diff": 2,
+        "ans": "# 判断：同一人，但第3张最不像\n\n## 逐项分析\n\n### 发型\n- **图1 & 图2**：长直发，浅棕色，发量和层次感一致\n- **图3**：发型略有不同，头发看起来稍短一些，发尾有更多的弯曲/波浪感，发色也稍深\n\n### 脸型\n- **图1 & 图2**：脸型非常一致，瓜子脸/鹅蛋脸，下巴尖细\n- **图3**：脸型略显不同，下颌线条稍宽，脸部比例微有变化\n\n### 肤色\n- **图1**：暖色自然光，肤色偏暖黄\n- **图2**：顶光/日光，肤色自然\n- **图3**：夜景闪光灯，肤色偏白/偏冷，与前两张差异最大\n\n### 五官细节\n- **图1 & 图2**：嘴唇厚度、鼻梁形状高度",
+        "ok": null,
+        "sec": 26.0,
+        "type": "human"
+      },
+      {
+        "qid": "FACE-D1",
+        "dim": "人脸细节",
+        "diff": 3,
+        "ans": "**脸型：** 鹅蛋\n**眼形：** 杏眼\n**眉形：** 柳叶\n**鼻型：** 挺直\n**唇形：** 樱桃",
+        "ok": null,
+        "sec": 12.1,
+        "type": "human"
+      },
+      {
+        "qid": "FACE-D2",
+        "dim": "人脸细节",
+        "diff": 2,
+        "ans": "她神情淡然自信，眼神直视镜头。",
+        "ok": null,
         "sec": 9.7,
-        "type": "auto"
-      },
-      {
-        "qid": "CLR-E",
-        "dim": "颜色",
-        "diff": 1,
-        "ans": "底色淡黄色/印花玫红色",
-        "ok": true,
-        "sec": 8.5,
-        "type": "auto"
-      },
-      {
-        "qid": "CLR-M",
-        "dim": "颜色",
-        "diff": 2,
-        "ans": "**浅黄色**",
-        "ok": true,
-        "sec": 20.7,
-        "type": "auto"
-      },
-      {
-        "qid": "CLR-H",
-        "dim": "颜色",
-        "diff": 3,
-        "ans": "**轻微差异**\n\n两张图的T恤印花都是红/粉红色系，文字内容和字体相同，但第一张图中的印花颜色偏浅粉红、略显褪色质感，而第二张图中的印花颜色更饱和、偏正红。这主要是由于两张照片的光线环境不同（第一张为室外自然光，第二张为室内暖色调光线）所造成的视觉差异，实际印花颜色应为同一色。",
-        "ok": null,
-        "sec": 23.1,
-        "type": "human"
-      },
-      {
-        "qid": "PER-E",
-        "dim": "人物",
-        "diff": 1,
-        "ans": "**是。**\n\n**依据：** 三个视图（正面、侧面、背面）中模特穿着完全相同的服装——黄色短款印有\"SMOKE I DON'T\"字样的T恤搭配深色高腰阔腿牛仔裤，且体型、发型、配饰（墨镜、手链）均一致，属于同一人同一套衣服的三视图展示。",
-        "ok": true,
-        "sec": 13.5,
-        "type": "auto"
-      },
-      {
-        "qid": "PER-M",
-        "dim": "人物",
-        "diff": 2,
-        "ans": "# 判断：**同一人**\n\n## 分析依据：\n\n### 发型\n- 两张图中均为**棕色长直发**，长度一致（及腰），中分偏分方式相同\n- 发色、发质、光泽度完全一致\n\n### 脸型\n- 均为**偏长的鹅蛋脸**，下颌线条相同\n- 五官比例一致：嘴唇形状、鼻梁轮廓、下巴弧度均吻合\n\n### 肤色\n- 两图肤色均为**偏白暖色调**，一致\n\n### 其他一致细节\n- **同款黑色猫眼墨镜**\n- **同一件黄色crop top**（印有\"SMOKE I DON'T\"红色字样）\n- **同一条深色高腰阔腿裤**（双扣设计）\n- **右手同款银色链条手链**\n- 体型、身材比例完全一致\n\n## 结论：",
-        "ok": null,
-        "sec": 19.9,
-        "type": "human"
-      },
-      {
-        "qid": "PER-H",
-        "dim": "人物",
-        "diff": 3,
-        "ans": "# 模特一致性分析\n\n## 逐张对比\n\n| 特征 | 图1 | 图2 | 图3 | 图4 | 图5 |\n|------|-----|-----|-----|-----|-----|\n| 服装 | 黄色crop tee + 深色阔腿裤 | 相同 | 相同 | 相同 | 相同 |\n| 墨镜 | 黑色猫眼款 | 相同 | 相同 | 相同 | 相同 |\n| 发色/发型 | 棕色长直发 | 相同 | 相同 | 相同 | 相同 |\n| 手链 | 右手银色链条 | 右手银色链条 | 右手银色链条 | 右手银色链条 | 右手银色链条 |\n| 脸型 | 瓜子脸 | 相同 | 相同 | 相同 | 相同 |\n| 嘴",
-        "ok": null,
-        "sec": 43.7,
-        "type": "human"
-      },
-      {
-        "qid": "PRD-E",
-        "dim": "商品",
-        "diff": 1,
-        "ans": "**是。**\n\n两张图片展示的是同一款T恤：\n\n- **颜色**：均为浅黄色（butter yellow）\n- **印花**：均为红/粉色字体印花，文字内容相同——\"SMOKE IDON'T\"，字体样式、排列方式及做旧质感一致\n- **版型**：均为女款修身短款（crop top），圆领、短袖\n\n第一张为真人上身街拍图，第二张为产品平铺展示图（含全身和局部特写），是同一款T恤的不同展示方式。",
-        "ok": true,
-        "sec": 21.8,
-        "type": "auto"
-      },
-      {
-        "qid": "PRD-H",
-        "dim": "商品",
-        "diff": 3,
-        "ans": "# 三视图服装一致性分析\n\n## 上衣（黄色短款T恤）\n\n**✅ 基本一致**\n- 三个视图中上衣的颜色、长度、剪裁均保持一致\n- 正面可见\"SMOKE I DON'T\"粉色文字，侧面可见部分文字，背面无文字——这是正常的印花表现，非差异\n\n## 下装（深色阔腿牛仔裤）\n\n**✅ 基本一致**\n- 颜色、版型、长度在三个视图中一致\n- 正面可见双扣装饰和褶裥设计\n- 侧面可见口袋\n- 背面可见后口袋\n\n## 配饰\n\n| 项目 | 正面 | 侧面 | 背面 |\n|------|------|------|------|\n| 墨镜 | ✅ 有 | ✅ 有 | ❌ 被头发遮挡/不可见 |\n| 手链/",
-        "ok": null,
-        "sec": 18.6,
-        "type": "human"
-      },
-      {
-        "qid": "HAL-E",
-        "dim": "抗幻觉",
-        "diff": 1,
-        "ans": "**0**",
-        "ok": true,
-        "sec": 8.2,
-        "type": "auto"
-      },
-      {
-        "qid": "HAL-H",
-        "dim": "抗幻觉",
-        "diff": 3,
-        "ans": "# T恤上的图案元素\n\n1. **文字\"SMOKE\"** — 红色/粉红色大写字母，位于上方一行\n2. **文字\"IDON'T\"** — 红色/粉红色大写字母，位于下方一行\n\n（两行文字组合起来可理解为 \"SMOKE? I DON'T\" 即\"抽烟？我不抽\"）\n\n---\n\n仅此两行文字，无其他图案、图形或装饰元素。",
-        "ok": null,
-        "sec": 14.8,
         "type": "human"
       }
     ],
     "gemini-3-flash(降级2.5)": [
       {
-        "qid": "OCR-E",
-        "dim": "OCR",
+        "qid": "FACE-E",
+        "dim": "人脸",
         "diff": 1,
-        "ans": "SMOKE\nIDON'T",
-        "ok": true,
-        "sec": 8.4,
-        "type": "auto"
+        "ans": "同一人。三张图中女性的脸型、五官特征、发型以及所穿的格纹上衣完全一致，且均处于同一咖啡馆场景中。",
+        "ok": null,
+        "sec": 7.2,
+        "type": "human"
       },
       {
-        "qid": "OCR-M",
-        "dim": "OCR",
+        "qid": "FACE-M",
+        "dim": "人脸",
         "diff": 2,
-        "ans": "SMOKE\nIDON'T",
+        "ans": "不同人。\n\n依据：两人的面部轮廓和五官特征存在明显差异，图1的脸型更圆润且人中较短，图2的脸型更偏鹅蛋脸且人中及鼻梁结构更为深邃。",
         "ok": true,
-        "sec": 9.2,
+        "sec": 16.3,
         "type": "auto"
       },
       {
-        "qid": "OCR-H",
-        "dim": "OCR",
+        "qid": "FACE-H",
+        "dim": "人脸",
         "diff": 3,
-        "ans": "SMOKE|IDON'T",
-        "ok": true,
-        "sec": 5.2,
+        "ans": "**同一人**（确切地说是同一人的**数字分身/AI 模特**）。\n\n**依据如下：**\n\n1.  **面部特征高度吻合：** 虽然第4张图中的模特戴着墨镜，但从正面和侧面看，其**下半张脸的轮廓、人中长度、唇形（嘴角微翘的弧度）以及下巴的形状**，都与前3张照片中的女性高度一致。\n2.  **发型与发色：** 模特的头发颜色（深棕/暖色调）、发质的垂坠感，以及**发缝的中分位置**，都与前3张照片中的女性完全相同。\n3.  **体态与比例：** 颈部的长度、肩膀的线条（平直肩）以及纤瘦的体型比例，在AI生成过程中较好地还原了原真人的特征。\n4.  **AI 训练逻辑：** 在目前的AI电商/",
+        "ok": false,
+        "sec": 18.5,
         "type": "auto"
       },
       {
-        "qid": "CLR-E",
-        "dim": "颜色",
-        "diff": 1,
-        "ans": "底色淡黄色/印花玫红色",
-        "ok": true,
-        "sec": 5.3,
-        "type": "auto"
-      },
-      {
-        "qid": "CLR-M",
-        "dim": "颜色",
+        "qid": "FACE-XM",
+        "dim": "人脸",
         "diff": 2,
-        "ans": "淡黄色",
-        "ok": true,
-        "sec": 15.3,
-        "type": "auto"
-      },
-      {
-        "qid": "CLR-H",
-        "dim": "颜色",
-        "diff": 3,
-        "ans": "相同。两图中T恤上的字母印花均为一致的深粉红色，虽然环境光线有别，但印花本身的色彩表现完全一致。",
+        "ans": "答：**同一人**，最不像的一张是 **3**。\n\n**判断依据：**\n1. **发型**：三张图的模特发色均为统一的浅棕/亚麻色，发质光泽感一致，且均为中分长直发，发际线与额头的衔接感非常相似。\n2. **脸型**：三者都是标准的心形脸/瓜子脸，下巴尖窄。其中图1和图2的脸部饱满度较为接近；图3因光线及姿势原因，脸型显得更为消瘦、深邃，面部折叠度比图1更高。\n3. **肤色**：肤色均为冷白皮，在不同光影（图1、2为日光，图3为夜间暖色环境光）下表现出了较高的一致性。\n\n**最不像的一张（3号）原因：**\n图3由于是夜景补光拍摄，阴影使得模特的颧骨和下颌线显得比前两张更加突兀，五官（尤其是鼻",
         "ok": null,
-        "sec": 10.3,
+        "sec": 18.0,
         "type": "human"
       },
       {
-        "qid": "PER-E",
-        "dim": "人物",
-        "diff": 1,
-        "ans": "是。依据：三张图中人物左手腕上均佩戴着同款银色链条手链。",
-        "ok": true,
-        "sec": 9.3,
-        "type": "auto"
+        "qid": "FACE-D1",
+        "dim": "人脸细节",
+        "diff": 3,
+        "ans": "根据您的要求，描述如下：\n\n瓜子、桃花、平直、秀挺、樱桃。",
+        "ok": null,
+        "sec": 10.6,
+        "type": "human"
       },
       {
-        "qid": "PER-M",
-        "dim": "人物",
+        "qid": "FACE-D2",
+        "dim": "人脸细节",
         "diff": 2,
-        "ans": "同一人。\n\n基于以下特征判断：\n*   **发型：** 两图模特的发型完全一致，均为中分的长直发，发色为浅棕/焦糖色。\n*   **脸型：** 脸型相同，均呈现出较为精致的瓜子脸/心形脸，下巴线条一致。\n*   **肤色：** 肤色高度一致，均为白皙肤色。\n*   **其他细节：** 两人佩戴了相同的黑色椭圆墨镜，穿着同样的黄色印字短款T恤和深蓝色裤子，手腕上的银色手链也完全一致。因此判断为同一人。",
+        "ans": "情绪平静淡然，眼神直视镜头。",
         "ok": null,
-        "sec": 6.8,
-        "type": "human"
-      },
-      {
-        "qid": "PER-H",
-        "dim": "人物",
-        "diff": 3,
-        "ans": "这五张图中的模特是**同一人**（或同一个AI生成的虚拟角色）。\n\n从面部特征（如脸型、鼻形、嘴唇的厚度及轮廓）、发色与发型、以及标志性的着装（印有“SMOKE IDON'T”字样的黄色露脐短袖、双扣设计的深蓝裤",
-        "ok": null,
-        "sec": 18.8,
-        "type": "human"
-      },
-      {
-        "qid": "PRD-E",
-        "dim": "商品",
-        "diff": 1,
-        "ans": "是",
-        "ok": true,
-        "sec": 7.0,
-        "type": "auto"
-      },
-      {
-        "qid": "PRD-H",
-        "dim": "商品",
-        "diff": 3,
-        "ans": "经过仔细观察，这三视图中的服装**并非完全一致**。虽然整体风格和颜色相同，但在细节处理上存在明显的逻辑差异（这通常是AI生成图像的典型特征）。\n\n以下是逐项列出的差异（视图/差异）：\n\n1.  **裤脚长度与鞋部表现 (视图：正面 vs. 侧面/背面)**\n    *   **正面：** 裤脚长度适中，完整露出了双脚的黑色皮鞋鞋头和部分鞋底。\n    *   **侧面/背面：** 裤脚明显变长。侧面视图中裤脚覆盖了大部分鞋子；背面视图中裤脚几乎拖地，完全遮盖了鞋子，看不到鞋跟或鞋底。\n\n2.  **裤子腰部扣子 (视图：正面 vs. 侧面)**\n    *   **正面：** 裤腰左右两侧各",
-        "ok": null,
-        "sec": 14.3,
-        "type": "human"
-      },
-      {
-        "qid": "HAL-E",
-        "dim": "抗幻觉",
-        "diff": 1,
-        "ans": "0",
-        "ok": true,
-        "sec": 4.6,
-        "type": "auto"
-      },
-      {
-        "qid": "HAL-H",
-        "dim": "抗幻觉",
-        "diff": 3,
-        "ans": "根据图片显示，这件黄色T恤上的图案元素仅包括以下内容：\n\n1. **第一行文字“SMOKE”**：位于胸前中央，由大写英文字母组成。\n2. **第二行文字“IDON'T”**：位于第一行下方，由大写英文字母和一个撇号（'）组成。\n3. **特定字体样式**：\n    * **颜色**：文字颜色为深红色（或紫红色）。\n    * **字形**：带有衬线（Serif）的字体。\n    * **质感**：文字表面呈现出磨损、斑驳的做旧效果（Distressed style）。\n\n除了上述文字及字体样式外，该T恤上没有其他任何Logo、插画、线条或装饰性图案。",
-        "ok": null,
-        "sec": 12.0,
+        "sec": 8.0,
         "type": "human"
       }
     ],
     "gpt-5.3-codex": [
       {
-        "qid": "OCR-E",
-        "dim": "OCR",
+        "qid": "FACE-E",
+        "dim": "人脸",
         "diff": 1,
-        "ans": "SMOKE I DON'T",
-        "ok": true,
-        "sec": 3.8,
-        "type": "auto"
+        "ans": "同一人。三张图里脸型偏小尖下巴、眼距和眼型、鼻唇比例、以及中分棕色长卷发和肤色都高度一致，仅是姿势与光线不同。",
+        "ok": null,
+        "sec": 15.2,
+        "type": "human"
       },
       {
-        "qid": "OCR-M",
-        "dim": "OCR",
+        "qid": "FACE-M",
+        "dim": "人脸",
         "diff": 2,
-        "ans": "SMOKE\nI DON'T",
-        "ok": true,
-        "sec": 4.4,
+        "ans": "同一人：两张图里发色与中分长发、脸型和下巴线条、嘴唇形状都高度一致。",
+        "ok": false,
+        "sec": 8.6,
         "type": "auto"
       },
       {
-        "qid": "OCR-H",
-        "dim": "OCR",
+        "qid": "FACE-H",
+        "dim": "人脸",
         "diff": 3,
-        "ans": "SMOKE|I DON'T",
-        "ok": true,
-        "sec": 5.6,
+        "ans": "结论：**同一人（高概率）**。  \n\n依据（看得到的稳定五官与体态特征基本一致）：\n1. **脸型与下巴**：都是偏窄的鹅蛋脸、下巴小而略尖。  \n2. **眼型**：均为较大的平行感双眼皮，外眼角微上扬，眼距比例接近。  \n3. **鼻唇比例**：鼻梁细直、鼻头小；人中与上唇厚度比例相似。  \n4. **发色与发缝**：都为偏棕的长直/微卷发，中分且发缝位置接近。  \n5. **身材骨架**：肩窄、手臂细长、整体纤细高挑，体态一致。  \n\n有差异的地方（不构成否定）：\n- 第4张戴墨镜、妆容与打光不同，且是AI三视图渲染，细节会被“标准化”；  \n- 服装不同、拍摄用途不同（生活照 vs ",
+        "ok": false,
+        "sec": 18.6,
         "type": "auto"
       },
       {
-        "qid": "CLR-E",
-        "dim": "颜色",
-        "diff": 1,
-        "ans": "底色浅黄/印花玫红",
-        "ok": true,
-        "sec": 4.3,
-        "type": "auto"
-      },
-      {
-        "qid": "CLR-M",
-        "dim": "颜色",
+        "qid": "FACE-XM",
+        "dim": "人脸",
         "diff": 2,
-        "ans": "淡黄色",
-        "ok": true,
-        "sec": 5.0,
-        "type": "auto"
-      },
-      {
-        "qid": "CLR-H",
-        "dim": "颜色",
-        "diff": 3,
-        "ans": "轻微差异：两图印花都为偏玫红色，但第二张在室内暖光下看起来更深、更偏红一些。",
+        "ans": "结论：**同一人**。  \n最不像的是：**3**。\n\n依据（发型/脸型/肤色）简要看：\n- **发型**：三张都是中分、浅棕长直发，长度和发际线很接近。  \n- **脸型**：都是偏窄的鹅蛋脸/小V脸，下巴线条一致。  \n- **肤色**：整体都是偏白暖调；第3张因夜景和闪光导致对比更强、肤色观感略有变化，所以看起来“最不像”。",
         "ok": null,
-        "sec": 9.0,
+        "sec": 11.6,
         "type": "human"
       },
       {
-        "qid": "PER-E",
-        "dim": "人物",
-        "diff": 1,
-        "ans": "是。依据：三视图中都穿着同一件浅黄色短袖上衣和同一条深蓝阔腿裤。",
-        "ok": true,
-        "sec": 5.1,
-        "type": "auto"
+        "qid": "FACE-D1",
+        "dim": "人脸细节",
+        "diff": 3,
+        "ans": "鹅蛋、杏眼、平眉、小翘、樱唇",
+        "ok": null,
+        "sec": 6.4,
+        "type": "human"
       },
       {
-        "qid": "PER-M",
-        "dim": "人物",
+        "qid": "FACE-D2",
+        "dim": "人脸细节",
         "diff": 2,
-        "ans": "同一人。",
+        "ans": "神情平静，直视镜头。",
         "ok": null,
-        "sec": 11.3,
-        "type": "human"
-      },
-      {
-        "qid": "PER-H",
-        "dim": "人物",
-        "diff": 3,
-        "ans": "看起来**是同一人**，五张里没有明显 outlier。  \n**结论：同一人（无 outlier）。**",
-        "ok": null,
-        "sec": 21.4,
-        "type": "human"
-      },
-      {
-        "qid": "PRD-E",
-        "dim": "商品",
-        "diff": 1,
-        "ans": "是。",
-        "ok": true,
-        "sec": 5.1,
-        "type": "auto"
-      },
-      {
-        "qid": "PRD-H",
-        "dim": "商品",
-        "diff": 3,
-        "ans": "三个视图的服装**整体一致**（同一套：浅黄色短袖T恤+深蓝阔腿裤），但因视角不同有可见信息差异：\n\n1. **正视图 / T恤正面有红色字母印花**（“SMOKE I DON’T”可见）  \n2. **侧视图 / 印花仅露出一部分**（前胸文字被角度遮挡）  \n3. **后视图 / T恤背面无印花**（为纯色）  \n4. **正视图 / 裤子前片细节可见**（门襟、前腰扣袢/装饰、前褶感）  \n5. **侧视图 / 裤子以侧缝轮廓为主**（前后口袋细节不完整）  \n6. **后视图 / 裤子后片细节可见**（两个后贴袋清晰）\n\n结论：**不是“每个视图看到的细节完全相同”，但属于同一件服装、",
-        "ok": null,
-        "sec": 7.1,
-        "type": "human"
-      },
-      {
-        "qid": "HAL-E",
-        "dim": "抗幻觉",
-        "diff": 1,
-        "ans": "0",
-        "ok": true,
-        "sec": 4.4,
-        "type": "auto"
-      },
-      {
-        "qid": "HAL-H",
-        "dim": "抗幻觉",
-        "diff": 3,
-        "ans": "T恤上的图案元素只有一项：\n\n1. **胸前玫红色大写字母文字印花**，分两行，内容可见为：  \n   - 第一行：`SMOKE`  \n   - 第二行：`I DON'T`  \n\n未看到其他图案（如图形、logo、条纹、卡通等）。",
-        "ok": null,
-        "sec": 6.8,
+        "sec": 5.8,
         "type": "human"
       }
     ]
   },
   "questions": [
     {
-      "id": "OCR-E",
-      "dim": "OCR",
+      "id": "FACE-E",
+      "dim": "人脸",
       "diff": 1,
       "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_00A_商品标准特写.png"
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/0c347cde-ccf4-44c9-9b47-d9701b2508ad.png",
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/f1ae19d9-4ced-4103-94bc-d298bf42ddfb.png",
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/f9e2f3dd-89fa-4491-a996-0887cf06ca58.png"
       ],
-      "q": "T恤胸口印花文字逐字母精确转写(含撇号)。只输出文字本身。",
-      "type": "auto",
-      "gold": "SMOKE I DON'T"
+      "q": "三张图中的女性是否同一个人？从脸型/五官/发型/肤色判断。第一词作答：同一人/不同人，然后一句依据。",
+      "type": "human",
+      "gold": "用户裁决（claude曾判不同人,codex倾向同人——争议题）"
     },
     {
-      "id": "OCR-M",
-      "dim": "OCR",
+      "id": "FACE-M",
+      "dim": "人脸",
       "diff": 2,
       "imgs": [
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/0c347cde-ccf4-44c9-9b47-d9701b2508ad.png",
         "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_01_户外街拍穿搭图.png"
       ],
-      "q": "T恤胸口印花文字逐字母精确转写(含撇号)。只输出文字本身。",
+      "q": "两张图的模特是否同一个人？答：同一人/不同人+一句依据。",
       "type": "auto",
-      "gold": "SMOKE I DON'T"
+      "gold": "不同人(跨人物负向对照)"
     },
     {
-      "id": "OCR-H",
-      "dim": "OCR",
+      "id": "FACE-H",
+      "dim": "人脸",
       "diff": 3,
       "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_06_模特局部穿搭图.png"
-      ],
-      "q": "T恤上所有可见文字逐字母精确转写，多个用|分隔。只输出文字。",
-      "type": "auto",
-      "gold": "SMOKE(可见部分)"
-    },
-    {
-      "id": "CLR-E",
-      "dim": "颜色",
-      "diff": 1,
-      "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_00A_商品标准特写.png"
-      ],
-      "q": "T恤底色和印花颜色各是什么？格式：底色X/印花Y，各5字内。",
-      "type": "auto",
-      "gold": "底色淡黄/印花粉红做旧(人工核)"
-    },
-    {
-      "id": "CLR-M",
-      "dim": "颜色",
-      "diff": 2,
-      "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_07_夜景街拍图.png"
-      ],
-      "q": "夜景灯光下，T恤的真实底色是什么？排除灯光偏色。5字内。",
-      "type": "auto",
-      "gold": "黄(系)"
-    },
-    {
-      "id": "CLR-H",
-      "dim": "颜色",
-      "diff": 3,
-      "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_01_户外街拍穿搭图.png",
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_05_场景种草图.png"
-      ],
-      "q": "两图T恤印花颜色是否相同？答：相同/轻微差异/明显不同+一句理由。",
-      "type": "human",
-      "gold": "人工裁决(gpt-5.2-pro 曾判:轻微色差)"
-    },
-    {
-      "id": "PER-E",
-      "dim": "人物",
-      "diff": 1,
-      "imgs": [
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/0c347cde-ccf4-44c9-9b47-d9701b2508ad.png",
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/f1ae19d9-4ced-4103-94bc-d298bf42ddfb.png",
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/f9e2f3dd-89fa-4491-a996-0887cf06ca58.png",
         "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_00B_模特三视图.png"
       ],
-      "q": "图中三个视图是否同一人同一套衣服？答：是/否+一处依据。",
+      "q": "四张图（前3张真实照片，第4张AI三视图）。第4张三视图里的模特与前3张照片里的女性是否同一人？答：同一人/不同人+依据。",
       "type": "auto",
-      "gold": "是"
+      "gold": "不同人(真照片vs AI模特)"
     },
     {
-      "id": "PER-M",
-      "dim": "人物",
+      "id": "FACE-XM",
+      "dim": "人脸",
       "diff": 2,
       "imgs": [
         "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_01_户外街拍穿搭图.png",
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_06_模特局部穿搭图.png"
-      ],
-      "q": "两图模特是否同一人？发型/脸型/肤色判断。答：同一人/不同人。",
-      "type": "human",
-      "gold": "人工裁决"
-    },
-    {
-      "id": "PER-H",
-      "dim": "人物",
-      "diff": 3,
-      "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_01_户外街拍穿搭图.png",
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_02_户外场景种草图.png",
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_05_场景种草图.png",
         "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_06_模特局部穿搭图.png",
         "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_07_夜景街拍图.png"
       ],
-      "q": "五张图模特是否同一人？若不是，指出第几张是outlier(编号1-5)。",
+      "q": "三张AI生成电商图的模特是否同一人？发型/脸型/肤色判断，答：同一人/不同人+指出最不像的一张(1/2/3)。",
       "type": "human",
-      "gold": "人工裁决(已知:05发丝微卷是弱outlier)"
+      "gold": "用户裁决(AI生成,已知基本一致但05不在其中)"
     },
     {
-      "id": "PRD-E",
-      "dim": "商品",
-      "diff": 1,
-      "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_01_户外街拍穿搭图.png",
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_03_白底单品图.png"
-      ],
-      "q": "两图T恤是否同一款(颜色/印花/版型)？答：是/否。",
-      "type": "auto",
-      "gold": "是"
-    },
-    {
-      "id": "PRD-H",
-      "dim": "商品",
+      "id": "FACE-D1",
+      "dim": "人脸细节",
       "diff": 3,
       "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_00B_模特三视图.png"
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/0c347cde-ccf4-44c9-9b47-d9701b2508ad.png"
       ],
-      "q": "三视图的三个视图服装是否完全一致？若有差异逐项列出(视图/差异)。",
+      "q": "描述这位女性的脸：脸型/眼形/眉形/鼻型/唇形各一个词，共5词。",
       "type": "human",
-      "gold": "人工裁决"
+      "gold": "用户裁决(考察描述精度与幻觉)"
     },
     {
-      "id": "HAL-E",
-      "dim": "抗幻觉",
-      "diff": 1,
+      "id": "FACE-D2",
+      "dim": "人脸细节",
+      "diff": 2,
       "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_00A_商品标准特写.png"
+        "/Users/Admin/Desktop/dify-pipeline/output/images/事例1/f9e2f3dd-89fa-4491-a996-0887cf06ca58.png"
       ],
-      "q": "这张图里有几只猫？只答数字。",
-      "type": "auto",
-      "gold": "0"
-    },
-    {
-      "id": "HAL-H",
-      "dim": "抗幻觉",
-      "diff": 3,
-      "imgs": [
-        "/Users/Admin/Desktop/dify-pipeline/output/bundles/T001_shein_official_v1/T001_01_户外街拍穿搭图.png"
-      ],
-      "q": "列出T恤上的所有图案元素(逐项)。没有的不要编造。",
+      "q": "她的情绪状态是什么？眼神方向看向哪里？15字内。",
       "type": "human",
-      "gold": "应只有SMOKE印花文字,编造徽标/动物/装饰=幻觉"
+      "gold": "用户裁决"
     }
   ]
 }

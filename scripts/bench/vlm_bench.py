@@ -111,6 +111,44 @@ def _norm_ocr(a: str) -> str:
 
 # ── 题库（真值 = 程序可测/人工金标）────────────────────────
 
+
+
+# ── 人脸专项题库 v2（题源: 事例1 真实人脸 + T001 模特图）─────
+
+EX1 = ROOT / "output" / "images" / "事例1"
+EX1_FACES = ["0c347cde-ccf4-44c9-9b47-d9701b2508ad.png",
+             "f1ae19d9-4ced-4103-94bc-d298bf42ddfb.png",
+             "f9e2f3dd-89fa-4491-a996-0887cf06ca58.png"]
+
+
+def build_face_questions():
+    g = lambda n: str(BUNDLE / f"T001_{n}.png")
+    e = lambda n: str(EX1 / n)
+    return [
+        dict(id="FACE-E", dim="人脸", diff=1, imgs=[e(n) for n in EX1_FACES],
+             q="三张图中的女性是否同一个人？从脸型/五官/发型/肤色判断。第一词作答：同一人/不同人，然后一句依据。",
+             type="human", gold="用户裁决（claude曾判不同人,codex倾向同人——争议题）"),
+        dict(id="FACE-M", dim="人脸", diff=2, imgs=[e(EX1_FACES[0]), g("01_户外街拍穿搭图")],
+             q="两张图的模特是否同一个人？答：同一人/不同人+一句依据。",
+             type="auto", check=lambda a: _clean(a).startswith("不同人"),
+             gold="不同人(跨人物负向对照)"),
+        dict(id="FACE-H", dim="人脸", diff=3,
+             imgs=[e(n) for n in EX1_FACES] + [g("00B_模特三视图")],
+             q="四张图（前3张真实照片，第4张AI三视图）。第4张三视图里的模特与前3张照片里的女性是否同一人？答：同一人/不同人+依据。",
+             type="auto", check=lambda a: _clean(a).startswith("不同人"),
+             gold="不同人(真照片vs AI模特)"),
+        dict(id="FACE-XM", dim="人脸", diff=2,
+             imgs=[g(n) for n in ["01_户外街拍穿搭图", "06_模特局部穿搭图", "07_夜景街拍图"]],
+             q="三张AI生成电商图的模特是否同一人？发型/脸型/肤色判断，答：同一人/不同人+指出最不像的一张(1/2/3)。",
+             type="human", gold="用户裁决(AI生成,已知基本一致但05不在其中)"),
+        dict(id="FACE-D1", dim="人脸细节", diff=3, imgs=[e(EX1_FACES[0])],
+             q="描述这位女性的脸：脸型/眼形/眉形/鼻型/唇形各一个词，共5词。",
+             type="human", gold="用户裁决(考察描述精度与幻觉)"),
+        dict(id="FACE-D2", dim="人脸细节", diff=2, imgs=[e(EX1_FACES[2])],
+             q="她的情绪状态是什么？眼神方向看向哪里？15字内。",
+             type="human", gold="用户裁决"),
+    ]
+
 def build_questions():
     g = lambda n: str(BUNDLE / f"T001_{n}.png")
     return [
@@ -195,7 +233,10 @@ def main():
     })
     print(f"[Bench] codex 选手: {codex_id}")
 
-    questions = build_questions()
+    import sys
+    face_mode = "--face" in sys.argv
+    questions = build_face_questions() if face_mode else build_questions()
+    print(f"[Bench] 模式: {'人脸专项(事例1真实人脸)' if face_mode else '商品全维度'}")
     results = {m: [] for m in MODELS}
     for q in questions:
         for mid, fn in MODELS.items():
