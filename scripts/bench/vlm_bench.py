@@ -149,6 +149,51 @@ def build_face_questions():
              type="human", gold="用户裁决"),
     ]
 
+
+
+# ── 718 成品图专项（用户作品题源：ChatGPT 生成人像）─────
+
+P718 = Path("/Users/Admin/Library/Containers/com.tencent.xinWeChat/Data/Documents/"
+            "xwechat_files/wxid_pazv0uyu05sy22_4915/msg/file/2026-08/"
+            "618 白棕色 白底图/718 成品图")
+G_A = ["ChatGPT Image 2026年8月14日 13_55_42.png", "ChatGPT Image 2026年8月14日 14_00_17.png",
+       "ChatGPT Image 2026年8月14日 14_03_32.png", "ChatGPT Image 2026年8月14日 14_04_28.png"]
+G_B = ["ChatGPT Image 2026年8月14日 13_55_06.png", "ChatGPT Image 2026年8月14日 14_05_43.png",
+       "ChatGPT Image 2026年8月14日 14_08_59.png"]
+G_USER3 = ["ChatGPT Image 2026年8月14日 14_30_23 (1).png",
+           "ChatGPT Image 2026年8月14日 14_30_23 (2).png",
+           "ChatGPT Image 2026年8月14日 14_30_23 (3).png"]
+
+
+def build_718_questions():
+    e = lambda n: str(P718 / n)
+    return [
+        dict(id="W-A4", dim="同人判定", diff=1, imgs=[e(n) for n in G_A],
+             q="四张图的模特是否同一个人？答：同一人/不同人+一句依据。",
+             type="auto", check=lambda a: _clean(a).startswith("同一人"),
+             gold="同一人(米白T系列,claude已验)"),
+        dict(id="W-B3", dim="同人判定", diff=2, imgs=[e(n) for n in G_B],
+             q="三张图的模特是否同一个人？答：同一人/不同人+一句依据。",
+             type="auto", check=lambda a: _clean(a).startswith("同一人"),
+             gold="同一人(粉吊带系列,claude已验)"),
+        dict(id="W-U3", dim="异人判定", diff=2, imgs=[e(n) for n in G_USER3],
+             q="三张图的模特是否同一个人？若不同，各有几个人？答：同一人/不同人(人数)+依据。",
+             type="auto", check=lambda a: "不同人" in _clean(a) and "3" in _clean(a)[:30],
+             gold="不同人(3人:波波头/眼镜低扎/长卷发)"),
+        dict(id="W-AB", dim="异人判定", diff=3,
+             imgs=[e(G_A[0]), e(G_B[0])],
+             q="两张图的模特是否同一个人？答：同一人/不同人+关键差异。",
+             type="auto", check=lambda a: _clean(a).startswith("不同人"),
+             gold="不同人(A群米白T vs B群粉吊带)"),
+        dict(id="W-MIX", dim="混合找茬", diff=3,
+             imgs=[e(G_A[0]), e(G_A[1]), e(G_USER3[0]), e(G_USER3[2])],
+             q="四张图里有几个不同的人？指出哪几张是同一人(编号1-4)。",
+             type="human", gold="2组:1+2同人,3+4各独立(共3人)——用户裁决"),
+        dict(id="W-D", dim="人脸细节", diff=3, imgs=[e(G_A[2])],
+             q="描述这位模特：脸型/眼形/发型发色/肤色/情绪，各一个词，共5词。",
+             type="human", gold="用户裁决(长卷深棕发/米白T那张)"),
+    ]
+
 def build_questions():
     g = lambda n: str(BUNDLE / f"T001_{n}.png")
     return [
@@ -234,9 +279,14 @@ def main():
     print(f"[Bench] codex 选手: {codex_id}")
 
     import sys
-    face_mode = "--face" in sys.argv
-    questions = build_face_questions() if face_mode else build_questions()
-    print(f"[Bench] 模式: {'人脸专项(事例1真实人脸)' if face_mode else '商品全维度'}")
+    mode = next((a for a in sys.argv[1:] if a.startswith("--")), "")
+    if mode == "--face":
+        questions = build_face_questions()
+    elif mode == "--718":
+        questions = build_718_questions()
+    else:
+        questions = build_questions()
+    print(f"[Bench] 模式: {mode or '商品全维度'}")
     results = {m: [] for m in MODELS}
     for q in questions:
         for mid, fn in MODELS.items():
