@@ -94,10 +94,19 @@ async def _gen_with_client(cfg: Config, plan: BundlePlan, slot, out_path: Path) 
 
 def _slot_refs(plan: BundlePlan, slot):
     """槽位参考图：按 uses 取素材（white/flat/model），按 preset 声明顺序。"""
+    import json as _json
     from .bundles import get_bundle
     from . import compose as compose_lib
-    b = get_bundle(plan.bundle_id)
-    slot_def = next((s for s in b["slots"] if s["pos"] == slot.pos and s["role"] == slot.role), None)
+    if plan.bundle_id.startswith("skill_"):
+        # 技能包槽位：preset 编码 "skill:{skill_id}:{pos}" → 从技能包 JSON 读 input_deps
+        skill_id = plan.bundle_id[len("skill_"):]
+        pack_f = Path(__file__).resolve().parent.parent.parent / "data" / "skills" / f"{skill_id}.json"
+        pack = _json.loads(pack_f.read_text(encoding="utf-8"))
+        slot_def = next((s for s in pack["slots"] if s["pos"] == slot.pos), None)
+        b = {"slots": pack["slots"]}
+    else:
+        b = get_bundle(plan.bundle_id)
+        slot_def = next((s for s in b["slots"] if s["pos"] == slot.pos and s["role"] == slot.role), None)
     # uses 来源：bundle slot 定义 > fashion/compose 预设声明
     uses = (slot_def or {}).get("uses") or _preset_uses(slot.preset)
     assets_dir = Path("data/assets")

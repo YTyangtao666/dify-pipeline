@@ -255,6 +255,131 @@ def bundle_status(pid: str, bid: str):
     return m
 
 
+
+
+# ── 风格技能包（Style Skill）──
+import time as _time_mod
+from fastapi import Form
+from scripts.pipeline import style_learner as style_learner_lib
+
+
+@app.post("/skills/learn")  # 上传样例图集 → 学习 → 技能包
+def learn_skill(skill_id: str = Form(""), name: str = Form(""),
+                files: list[UploadFile] = File(...)):
+    if not skill_id:
+        skill_id = f"style_{int(_time_mod.time())}"
+    d = ASSETS_DIR / "_samples" / skill_id
+    d.mkdir(parents=True, exist_ok=True)
+    saved = []
+    for f in files:
+        ext = ALLOWED_TYPES.get(f.content_type or "")
+        if not ext:
+            continue
+        p = d / f"{len(saved)+1}{ext}"
+        p.write_bytes(f.file.read())
+        saved.append(p)
+    if not saved:
+        return JSONResponse({"detail": "未收到有效图片(png/jpeg/webp)"}, status_code=415)
+    pack = style_learner_lib.learn_from_dir(
+        d, skill_id=skill_id, name=name or skill_id, data_dir=ROOT / "data")
+    return {"skill_id": pack["skill_id"], "name": pack["name"],
+            "slots": [{"pos": s["pos"], "role": s["role"], "size": s["size"],
+                       "input_deps": s["input_deps"]} for s in pack["slots"]],
+            "samples": len(saved)}
+
+
+@app.get("/skills")  # 技能包列表
+def list_skills():
+    d = ROOT / "data" / "skills"
+    out = []
+    if d.exists():
+        for f in sorted(d.glob("*.json")):
+            try:
+                pack = json.loads(f.read_text(encoding="utf-8"))
+                out.append({"skill_id": pack["skill_id"], "name": pack.get("name", ""),
+                            "slots": len(pack.get("slots", [])),
+                            "created": pack.get("created", "")})
+            except Exception:  # noqa: BLE001
+                continue
+    return {"skills": out}
+
+
+@app.post("/generate/skill")  # 技能包 × 商品素材 → 一键批量生成
+def generate_by_skill(body: dict):
+    skill_id = body.get("skill_id", "")
+    pid = body.get("product_id", "")
+    try:
+        pack = style_learner_lib.load_skill_pack(skill_id, data_dir=ROOT / "data")
+    except FileNotFoundError:
+        try:
+            pack = style_learner_lib.load_skill_pack(skill_id, data_dir=ASSETS_DIR)
+        except FileNotFoundError:
+            return JSONResponse({"detail": f"技能包不存在: {skill_id}"}, status_code=404)
+
+    adir = ASSETS_DIR / pid
+    have = set()
+    if adir.exists():
+        for kind in ("white", "flat", "model", "onbody"):
+            if list(adir.glob(f"{kind}_*")):
+                have.add(kind)
+    runnable = [s for s in pack["slots"]
+                if set(s["input_deps"]) <= have]
+    if not runnable:
+        need = set()
+        for s in pack["slots"]:
+            need |= set(s["input_deps"])
+        return JSONResponse({"detail": f"商品 {pid} 缺素材：需要 {sorted(need)}，"
+                                        f"已有 {sorted(have)}"}, status_code=400)
+
+    # 商品文字数据注入（灵活：有什么注入什么）
+    titles = {}
+    products_f = ROOT / "data" / "products.json"
+    if products_f.exists():
+        titles = {p["product_id"]: p.get("title", "") for p in json.loads(products_f.read_text(encoding="utf-8"))}
+    selling = []
+    sp_f = ROOT / "data" / f"selling_points_{pid}.json"
+    if sp_f.exists():
+        try:
+            selling = [t["point"] for t in json.loads(sp_f.read_text(encoding="utf-8")).get("top3", [])]
+        except Exception:  # noqa: BLE001
+            pass
+    sp_block = ("画面需视觉可见地传达卖点：" + "；".join(selling[:3]) + "。") if selling else ""
+
+    from scripts.pipeline.bundles import BundlePlan, SlotPlan
+    slots = [SlotPlan(pos=s["pos"], role=s["role"], preset=f"skill:{skill_id}:{s['pos']}",
+                      size=s["size"],
+                      filename=f"{pid}_{s['pos']:02d}_{s['role']}.png",
+                      runnable=True) for s in runnable]
+    plan = BundlePlan(bundle_id=f"skill_{skill_id}", product_id=pid, slots=slots)
+    out_dir = ROOT / "output" / "bundles" / f"{pid}_{skill_id}"
+    # runner 的 prompt 构建：技能槽位走 pack template
+    import scripts.pipeline.runner as _r
+    _orig = _r._build_slot_prompt
+
+    def _skill_prompt(plan2, slot, compose_lib, _pack=pack, _titles=titles,
+                      _sp=sp_block, _orig=_orig):
+        for s in _pack["slots"]:
+            if s["pos"] == slot.pos:
+                t = s["template"].format(
+                    title=_titles.get(plan2.product_id, plan2.product_id),
+                    selling_points=_sp)
+                return t
+        return _orig(plan2, slot, compose_lib)
+
+    _r._build_slot_prompt = _skill_prompt
+    try:
+        manifest = runner_lib.run_bundle(plan, out_dir=out_dir,
+                                         retry_failed=bool(body.get("retry_failed")))
+    finally:
+        _r._build_slot_prompt = _orig
+    ok = manifest["summary"]["ok"]
+    skipped = len(pack["slots"]) - len(runnable)
+    manifest["summary"]["skipped"] = skipped
+    if ok == 0:
+        return JSONResponse(manifest, status_code=502)
+    return manifest
+
+
 if __name__ == "__main__":
     import os
     import uvicorn

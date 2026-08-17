@@ -1,0 +1,22 @@
+{
+  "skill_id": "style_1786951407",
+  "name": "style_1786951407",
+  "title_hint": "",
+  "created": "2026-08-17T15:23:27",
+  "learned_from": "/private/var/folders/ky/_93g3fn944j_f3539fykfhmw0000gp/T/pytest-of-Admin/pytest-347/test_learn_skill_from_images0/_samples/style_1786951407",
+  "slots": [
+    {
+      "pos": 1,
+      "role": "模特正面生活图",
+      "size": "3:4",
+      "input_deps": [
+        "flat",
+        "model"
+      ],
+      "template": "生成模特正面生活图：中景。构图：半身，虚化背景。灯光：柔光。自然。服装款式/版型/图案与平铺参考图 100% 一致。{title}{selling_points}\n模特面部必须与第二张参考图（模特照片）100% 一致：同一张脸、同一发型发色、同一妆容，严禁改变五官或换人。\n模特身材要求：高挑纤细、大长腿、腰臀比黄金比例、肩颈线条优雅、体态挺拔，时尚大片级身材，具有视觉冲击力。\n真实摄影质感：保留皮肤自然纹理与毛孔、发丝根根分明，胶片颗粒感，禁止塑料感皮肤、过度磨皮、AI精修感。"
+    }
+  ],
+  "quality_bar": {
+    "min_usable_rate": 80
+  }
+}
