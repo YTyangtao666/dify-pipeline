@@ -41,6 +41,19 @@ def run_bundle(plan: BundlePlan, *, out_dir: Path,
     skipped = 0
     t0 = time.time()
 
+    # 两段式：先生成「商品标准特写」——以平铺/白底图为参考、最强商品约束、
+    # 只生成一次；后续所有槽位将其注入参考图首位，商品颜色/印花向同一张图收敛。
+    anchor_name = f"{plan.product_id}_00_商品标准特写.png"
+    anchor_path = out_dir / anchor_name
+    if plan.bundle_id.startswith("skill_") and not anchor_path.exists():
+        try:
+            asyncio.run(_gen_product_anchor(cfg, plan, anchor_path))
+            generated.append(str(anchor_path))
+            print(f"  ✓ [00] 商品标准特写 → {anchor_name}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  ! [00] 商品标准特写失败(不阻塞槽位): {str(e)[:120]}")
+            anchor_path = None
+
     for slot in plan.slots:
         if not slot.runnable:
             skipped += 1
@@ -51,7 +64,7 @@ def run_bundle(plan: BundlePlan, *, out_dir: Path,
             pass  # 正常模式不读旧 manifest，直接生成
         out_path = out_dir / slot.filename
         try:
-            r = asyncio.run(_gen_with_client(cfg, plan, slot, out_path))
+            r = asyncio.run(_gen_with_client(cfg, plan, slot, out_path, anchor=anchor_path))
             generated.append(str(out_path))
             print(f"  ✓ [{slot.pos}] {slot.role} → {slot.filename}")
             if on_progress:
@@ -81,14 +94,40 @@ def run_bundle(plan: BundlePlan, *, out_dir: Path,
     return manifest
 
 
-async def _gen_with_client(cfg: Config, plan: BundlePlan, slot, out_path: Path) -> GenResult:
+async def _gen_with_client(cfg: Config, plan: BundlePlan, slot, out_path: Path, *,
+                           anchor: Path | None = None) -> GenResult:
     """单槽位生成：独立事件循环内的 client 生命周期（避免跨 loop 复用）。"""
     from . import compose as compose_lib
     prompt = _build_slot_prompt(plan, slot, compose_lib)
     refs = _slot_refs(plan, slot)
+    if anchor is not None and anchor.exists():
+        refs = [anchor] + refs
     async with build_client(cfg) as client:
         return await generate_image(cfg, prompt, out_path,
                                     size=slot.size, interval=1.0,
+                                    client=client, reference_images=refs)
+
+
+async def _gen_product_anchor(cfg: Config, plan: BundlePlan, out_path: Path) -> GenResult:
+    """商品标准特写：平铺/白底图参考 + 最强商品保真约束。"""
+    assets_dir = Path("data/assets") / plan.product_id
+    ref = None
+    for kind in ("flat", "white", "model", "onbody"):
+        pool = sorted(assets_dir.glob(f"{kind}_*")) if assets_dir.exists() else []
+        if pool:
+            ref = pool[0]
+            break
+    prompt = (
+        "电商商品标准特写图，纯白背景。"
+        "第一张参考图是商品本体平铺图：商品颜色、印花图案、印花文字内容与字体颜色、"
+        "版型、衣长、袖型、每一处细节逐项完全复刻，印花文字逐字母一致，"
+        "严禁添加参考图上不存在的任何图案、装饰或文字。"
+        "正面完整呈现商品，无模特、无场景，构图居中，商品占画面主体。"
+    )
+    refs = [ref] if ref else []
+    async with build_client(cfg) as client:
+        return await generate_image(cfg, prompt, out_path,
+                                    size="3:4", interval=1.0,
                                     client=client, reference_images=refs)
 
 

@@ -98,3 +98,50 @@ def test_skipped_slots_not_attempted(tmp_path, monkeypatch):
     result = runner.run_bundle(plan, out_dir=tmp_path / "out")
     assert ran == ["x.png"]
     assert result["summary"]["skipped"] == 1
+
+
+def test_product_anchor_generated_first_and_injected(tmp_path, monkeypatch):
+    """两段式：先出商品标准特写，后续槽位把它注入参考图首位。"""
+    from scripts.pipeline import runner
+    from scripts.pipeline.bundles import BundlePlan, SlotPlan
+
+    calls = []
+
+    async def fake_gen(cfg, prompt, out_path, **kw):
+        calls.append({"prompt": prompt, "refs": [str(r) for r in kw.get("reference_images", [])],
+                      "out": str(out_path)})
+        out_path.write_bytes(b"x")
+        return None
+
+    monkeypatch.setattr(runner, "generate_image", fake_gen)
+    monkeypatch.setattr(runner, "_slot_refs", lambda plan, slot: ["/tmp/flat_1.png"])
+    monkeypatch.setattr(runner, "_build_slot_prompt", lambda plan, slot, cl: f"prompt-{slot.pos}")
+    # 造商品素材,供 _gen_product_anchor 找到 flat 参考图(runner 用相对路径 data/assets)
+    from pathlib import Path as _Path
+    assets = _Path.cwd() / "data" / "assets" / "P1"
+    assets.mkdir(parents=True, exist_ok=True)
+    f = assets / "flat_1.png"
+    f.write_bytes(b"x")
+    import pytest as _pytest
+
+    @_pytest.fixture(autouse=True)
+    def _cleanup():
+        yield
+        import shutil as _sh
+        _sh.rmtree(assets, ignore_errors=True)
+
+    slots = [SlotPlan(pos=1, role="白底单品图", preset="skill:s1:1", size="3:4",
+                      filename="P1_01_白底单品图.png", runnable=True),
+             SlotPlan(pos=2, role="街拍图", preset="skill:s1:2", size="3:4",
+                      filename="P1_02_街拍图.png", runnable=True)]
+    plan = BundlePlan(bundle_id="skill_s1", product_id="P1", slots=slots)
+    manifest = runner.run_bundle(plan, out_dir=tmp_path)
+
+    assert manifest["summary"]["ok"] == 3  # 1 特写 + 2 槽位
+    first = calls[0]
+    assert "商品标准特写" in first["prompt"] or "标准特写" in first["prompt"]
+    assert first["refs"] and any("flat_1.png" in r for r in first["refs"])
+    # 后续槽位: 特写图必须是参考图第一位
+    assert calls[1]["refs"][0].endswith("P1_00_商品标准特写.png")
+    assert calls[2]["refs"][0].endswith("P1_00_商品标准特写.png")
+    assert (tmp_path / "P1_00_商品标准特写.png").exists()
