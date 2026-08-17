@@ -217,6 +217,7 @@ workflow:
             comparison_operator: is
             value: 'true'
         - case_id: 'false'
+          logical_operator: and
           conditions: []
       type: custom
       sourcePosition: right

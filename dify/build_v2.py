@@ -125,7 +125,8 @@ def build() -> dict:
              "variable_selector": ["parse-report", "coverage_pass"],
              "comparison_operator": "is", "value": "true"},
         ],
-    }, {"case_id": "false", "conditions": []}]
+        "logical_operator": "and",
+    }, {"case_id": "false", "logical_operator": "and", "conditions": []}]
 
     # --- 6. llm-advice 容灾模型 + prompt ---
     nodes["llm-advice"]["data"]["model"] = {
