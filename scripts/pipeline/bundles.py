@@ -85,6 +85,22 @@ BUNDLES: dict[str, dict] = {
              "market": "me"},
         ],
     },
+    "shein_tshirt": {
+        "name": "SHEIN官方结构包（8张）",
+        "desc": "对标SHEIN官方SKU素材结构：模特主图×2+白底正/背+细节四宫格+俯拍+夜景街拍",
+        "slots": [
+            {"pos": 1, "role": "模特正面", "preset": "model_front", "size": "3:4", "uses": ["flat", "model"]},
+            {"pos": 2, "role": "斜侧特写", "preset": "model_front", "size": "3:4", "uses": ["flat", "model"],
+             "variant_hint": "斜侧45度"},
+            {"pos": 3, "role": "白底正面", "preset": "white_front", "size": "1:1", "uses": ["flat"]},
+            {"pos": 4, "role": "白底背面", "preset": "white_back", "size": "1:1", "uses": ["flat"]},
+            {"pos": 5, "role": "细节四宫格", "preset": "detail_grid4", "size": "1:1", "uses": ["flat"]},
+            {"pos": 6, "role": "俯拍日常", "preset": "overhead_casual", "size": "3:4", "uses": ["flat", "model"]},
+            {"pos": 7, "role": "夜景街拍", "preset": "street_night", "size": "3:4", "uses": ["flat", "model"]},
+            {"pos": 8, "role": "背面上身", "preset": "model_front", "size": "3:4", "uses": ["flat", "model"],
+             "variant_hint": "展示背面"},
+        ],
+    },
     "full_launch": {
         "name": "全量上架包（11张）",
         "desc": "tmall_main5 + xhs_pack6 组合，一次跑齐",

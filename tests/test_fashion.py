@@ -55,3 +55,17 @@ def test_fashion_bundle_slots():
     presets = {s["preset"] for s in b["slots"]}
     assert "ai_tryon" in presets
     assert "color_swatch" in presets
+
+def test_shein_official_presets():
+    """SHEIN 官方素材结构（shein-tshirt 9图）提炼的预设齐全。"""
+    for pid in ["model_front", "street_night", "white_front", "white_back",
+                "detail_grid4", "overhead_casual"]:
+        assert pid in fashion.FASHION_PRESETS, pid
+        assert "{title}" in fashion.FASHION_PRESETS[pid]["template"]
+
+
+def test_shein_tshirt_bundle():
+    from scripts.pipeline.bundles import BUNDLES, get_bundle
+    assert "shein_tshirt" in BUNDLES
+    b = get_bundle("shein_tshirt")
+    assert len(b["slots"]) == 8
