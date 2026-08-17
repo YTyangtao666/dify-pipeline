@@ -293,3 +293,14 @@ def build_report(verdicts: list[Verdict]) -> dict:
             for v in verdicts
         ],
     }
+
+
+def coverage_pct(overall: dict) -> float | None:
+    """Top3 打穿率：hit 数 / Top3 判定总数。无 Top3 数据返回 None（styles 模式不卡）。"""
+    total = sum(len(it.get("top3_hits") or []) for it in overall.get("items", []))
+    if total == 0:
+        return None
+    hits = sum(1 for it in overall.get("items", [])
+               for h in (it.get("top3_hits") or [])
+               if isinstance(h, dict) and h.get("hit"))
+    return round(hits / total * 100, 2)

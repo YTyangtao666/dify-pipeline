@@ -84,6 +84,8 @@ async def run(images_dir: Path, out_dir: Path, products_file: Path) -> dict:
     result = {"overall": overall, "products": reports}
     out = out_dir / "eval_report.json"
     out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    cov = evaluator.coverage_pct(overall)
+    print(f"[03] top3_coverage={'none' if cov is None else f'{cov:.1f}%'}")
     print(f"[03] 总体可用率 {overall['usable_rate']}%  top_issue={overall['top_issue'] or '无'} → {out}")
     return result
 
