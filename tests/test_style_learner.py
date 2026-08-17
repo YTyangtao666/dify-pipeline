@@ -91,3 +91,29 @@ def test_fashion_redlines_attached_for_model_slots():
     assert "100% 一致" in t      # MODEL_ANCHOR
     assert "大长腿" in t          # BODY_DIRECTIVE
     assert "毛孔" in t            # ANTI_AI_SKIN
+
+
+def test_template_has_garment_fidelity_anchor():
+    from scripts.pipeline.style_learner import cluster_slots  # noqa
+    """技能包 template 必须含商品保真锚定（最高优先级声明+逐项复刻+禁止添加图案）。"""
+    slots = cluster_slots([
+        {"type": "场景种草图", "composition": "中景，背景城市街道虚化",
+         "lighting": "自然光", "pose": "站立", "framing": "中景",
+         "input_deps": ["flat", "model"]},
+    ])
+    t = slots[0]["template"]
+    assert "第一张参考图是商品平铺图" in t
+    assert "严禁添加" in t and "字体颜色" in t
+
+
+def test_style_content_separation():
+    """构图描述不携带样例特有内容（道具/印花）——由 VLM prompt 保证，
+    聚合层兜底过滤：黑轿车/游船/鸡尾酒等具体物件词不入 template。"""
+    from scripts.pipeline.style_learner import cluster_slots  # noqa
+    slots = cluster_slots([
+        {"type": "场景种草图",
+         "composition": "中景，背景为游船外的水面与城市建筑虚化",
+         "lighting": "自然散射光", "pose": "扶围栏", "framing": "中景",
+         "input_deps": ["flat", "model"]},
+    ])
+    assert "游船" not in slots[0]["template"]

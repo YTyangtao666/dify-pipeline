@@ -46,6 +46,16 @@ def infer_deps(analysis: dict) -> list[str]:
     return ["flat"]
 
 
+# 样例特有内容兜底过滤（VLM prompt 已要求忽略，聚合层再兜一层）
+_PROPS_BLOCKLIST = ["游船", "鸡尾酒", "轿车", "栏杆", "围栏", "甜点", "咖啡杯", "海报"]
+
+
+def _strip_props(text: str) -> str:
+    for w in _PROPS_BLOCKLIST:
+        text = text.replace(w, "")
+    return text
+
+
 def cluster_slots(analyses: list[dict]) -> list[dict]:
     """同类型合并取共性，跨类型分槽位。"""
     by_type: dict[str, list[dict]] = {}
@@ -54,16 +64,21 @@ def cluster_slots(analyses: list[dict]) -> list[dict]:
 
     slots = []
     for role, group in by_type.items():
-        comps = "；".join(dict.fromkeys(a.get("composition", "") for a in group if a.get("composition")))
+        comps = "；".join(dict.fromkeys(_strip_props(a.get("composition", "")) for a in group if a.get("composition")))
         lights = "；".join(dict.fromkeys(a.get("lighting", "") for a in group if a.get("lighting")))
-        poses = "；".join(dict.fromkeys(a.get("pose", "") for a in group if a.get("pose")))
+        poses = "；".join(dict.fromkeys(_strip_props(a.get("pose", "")) for a in group if a.get("pose")))
         framings = "；".join(dict.fromkeys(a.get("framing", "") for a in group if a.get("framing")))
         deps = group[0].get("input_deps") or infer_deps(group[0])
+        garment_anchor = (
+            "【商品保真·最高优先级】第一张参考图是商品平铺图：服装的颜色、印花内容、印花文字、"
+            "字体颜色、版型、衣长、袖型必须与平铺图逐项完全复刻——印花文字逐字母一致，"
+            "印花颜色（含字体色）不得改变，严禁添加平铺图上不存在的任何图案或装饰。"
+        )
         template = (
             f"生成{role}：{framings}。构图：{comps}。灯光：{lights}。"
             + (f"{poses}。" if poses else "")
-            + "服装款式/版型/图案与平铺参考图 100% 一致。{title}"
-            + ("{selling_points}" if "model" in deps else "")
+            + f"{garment_anchor}商品：{{title}}。"
+            + ("画面需传达：{selling_points}" if "model" in deps else "")
         )
         if "model" in deps:
             template += f"\n{MODEL_ANCHOR}\n{BODY_DIRECTIVE}\n{ANTI_AI_SKIN}"
@@ -126,11 +141,13 @@ def load_skill_pack(skill_id: str, *, data_dir: Path) -> dict:
 
 # ── VLM 逆向分析（真实链路：gemini-2.5-flash @ apimart relay 或直连代理） ──
 ANALYZE_PROMPT = (
-    "分析这张电商素材图，只输出 JSON（无其他文字）："
+    "分析这张电商素材图的可复用【风格要素】。注意：只提取可跨商品复用的构图/灯光/姿势/景别，"
+    "忽略该样例特有的商品内容（印花文字/颜色/图案）、具体环境物件（车/船/杯子等道具）和模特长相。"
+    "只输出 JSON（无其他文字）："
     '{"type": "图类型(如:模特正面生活图/白底平铺图/细节特写图/场景种草图/夜景街拍图)",'
-    ' "composition": "构图(景别+主体位置+背景处理)",'
+    ' "composition": "构图(景别+主体位置+背景虚化处理,环境只写大类如城市街道/室内,不写具体物件)",'
     ' "lighting": "灯光(方向+质感)",'
-    ' "pose": "模特姿势(无模特则空串)",'
+    ' "pose": "模特姿势(通用描述,无模特则空串)",'
     ' "framing": "取景范围(如胸到腰中景)"}'
 )
 
