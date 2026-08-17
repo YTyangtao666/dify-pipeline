@@ -69,3 +69,28 @@ def test_shein_tshirt_bundle():
     assert "shein_tshirt" in BUNDLES
     b = get_bundle("shein_tshirt")
     assert len(b["slots"]) == 8
+
+
+def test_model_anchor_injected_by_default():
+    from scripts.pipeline.fashion import build_fashion_prompt, build_market_prompt  # noqa
+    """模特图预设默认注入:身份锚定+身材红线+反AI味。"""
+    s = build_fashion_prompt("model_front", title="T恤")
+    assert "100% 一致" in s          # 面部锚定
+    assert "大长腿" in s              # 身材红线
+    assert "毛孔" in s                # 反AI味
+
+
+def test_market_variant_keeps_body_but_no_anchor():
+    from scripts.pipeline.fashion import build_market_prompt  # noqa
+    """market 变体:保留身材+质感,但面部不锚定(换市场人种)。"""
+    s = build_market_prompt("ai_tryon", market="us", title="dress")
+    assert "大长腿" in s and "毛孔" in s
+    assert "与第二张参考图（模特照片）100% 一致" not in s
+
+
+def test_non_model_preset_no_anchor():
+    from scripts.pipeline.fashion import build_fashion_prompt  # noqa
+    """无模特预设(白底平铺)不注入面部锚定(无关且干扰)。"""
+    s = build_fashion_prompt("white_front", title="T恤")
+    assert "100% 一致" not in s
+    assert "大长腿" not in s  # 无模特也无身材指令

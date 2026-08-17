@@ -128,6 +128,22 @@ FASHION_PRESETS: dict[str, dict] = {
 }
 
 
+
+# ── 模特质量红线（用户验收标准：脸要一致+无AI味+身材极品） ──
+MODEL_ANCHOR = (
+    "模特面部必须与第二张参考图（模特照片）100% 一致：同一张脸、同一发型发色、同一妆容，"
+    "严禁改变五官或换人。"
+)
+BODY_DIRECTIVE = (
+    "模特身材要求：高挑纤细、大长腿、腰臀比黄金比例、肩颈线条优雅、体态挺拔，"
+    "时尚大片级身材，具有视觉冲击力。"
+)
+ANTI_AI_SKIN = (
+    "真实摄影质感：保留皮肤自然纹理与毛孔、发丝根根分明，胶片颗粒感，"
+    "禁止塑料感皮肤、过度磨皮、AI精修感。"
+)
+
+
 # ── 多市场变体（SHEIN 主战场） ──
 MARKET_VARIANTS: dict[str, dict] = {
     "us": {
@@ -156,19 +172,31 @@ MARKET_VARIANTS: dict[str, dict] = {
 
 def build_fashion_prompt(preset_id: str, *, title: str,
                          top3_points: list[str] | None = None,
-                         color: str = "", prompt_extra: str = "") -> str:
-    """女装预设 prompt：款式一致性红线 + 卖点 + 颜色/市场注入。"""
+                         color: str = "", prompt_extra: str = "",
+                         anchor_model: bool = True) -> str:
+    """女装预设 prompt：款式一致性红线 + 卖点 + 颜色/市场注入。
+
+    anchor_model=True（默认）：注入模特身份锚定+身材+反AI味三条红线，
+    保证跨槽位同一模特、极品身材、真实质感。market 变体走 build_market_prompt
+    会关掉面部锚定（按市场换人是特性）但保留身材与质感红线。
+    """
     p = FASHION_PRESETS[preset_id]
     top3 = ""
     if top3_points:
         lines = "\n".join(f"- {t}" for t in top3_points[:3])
         top3 = f"画面需视觉可见地传达卖点：\n{lines}\n"
     base = p["template"].format(title=title, top3=top3)
+    has_model = "model" in p.get("uses", [])
+    quality = ""
+    if has_model:
+        quality = "\n" + BODY_DIRECTIVE + "\n" + ANTI_AI_SKIN
+        if anchor_model:
+            quality = "\n" + MODEL_ANCHOR + quality
     if color:
         base = f"服装颜色指定：{color}（款式版型仍以平铺图为准）。{base}"
     if prompt_extra:
         base = prompt_extra + base
-    return base
+    return base + quality
 
 
 def build_market_prompt(preset_id: str, *, market: str, title: str,
@@ -183,7 +211,7 @@ def build_market_prompt(preset_id: str, *, market: str, title: str,
              f"场景={mv['scene_brief']}。模特面部不要求与参考模特一致——"
              f"按目标市场人种重新生成；但服装款式必须与平铺参考图完全一致。")
     return build_fashion_prompt(preset_id, title=title, top3_points=top3_points,
-                                prompt_extra=extra)
+                                prompt_extra=extra, anchor_model=False)
 
 
 @dataclass
