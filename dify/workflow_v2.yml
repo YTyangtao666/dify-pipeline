@@ -216,9 +216,6 @@ workflow:
             - coverage_pass
             comparison_operator: is
             value: 'true'
-        - case_id: 'false'
-          logical_operator: and
-          conditions: []
       type: custom
       sourcePosition: right
       targetPosition: left

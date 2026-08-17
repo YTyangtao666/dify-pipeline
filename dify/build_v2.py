@@ -126,7 +126,7 @@ def build() -> dict:
              "comparison_operator": "is", "value": "true"},
         ],
         "logical_operator": "and",
-    }, {"case_id": "false", "logical_operator": "and", "conditions": []}]
+    }]  # ELSE 是隐式 default 分支，不作为 case（否则前端检查清单报"ELIF不能为空"）
 
     # --- 6. llm-advice 容灾模型 + prompt ---
     nodes["llm-advice"]["data"]["model"] = {
