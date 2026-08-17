@@ -45,6 +45,24 @@ h1 span{color:var(--gold)}
 #bar{height:6px;background:var(--line);border-radius:3px;margin-top:14px;overflow:hidden;display:none}
 #bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-d));transition:width .4s}
 .hint{font-size:12px;color:var(--sub);margin-top:8px}
+
+.blk{margin-top:22px;padding-top:18px;border-top:1px dashed var(--line)}
+.blk h2{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.blk h2 .tag{font-size:11px;background:var(--gold);color:#fff;border-radius:4px;padding:2px 8px;font-weight:400}
+.bcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.bc{border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;transition:.15s;background:var(--card)}
+.bc.on{border-color:var(--gold);background:#fdf9f0;box-shadow:0 2px 10px rgba(201,168,106,.15)}
+.bc b{font-size:14px}
+.bc .meta{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.7}
+.bc .cost{color:var(--gold-d);font-weight:600}
+.bc .no{opacity:.5}
+#bgo{margin-top:14px;width:100%;padding:13px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+#bgo:disabled{opacity:.4;cursor:not-allowed}
+.bshots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+.bshot{background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:12px}
+.bshot img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.bshot .m{padding:6px 8px;display:flex;justify-content:space-between}
+
 </style>
 </head>
 <body>
@@ -70,6 +88,15 @@ h1 span{color:var(--gold)}
       <div class="pids" id="pids"></div>
       <div class="presets" id="presets"></div>
     </div>
+  </div>
+
+  
+  <div class="blk">
+    <h2><i class="dot"></i>套餐模式 · 整包生产 <span class="tag">推荐</span></h2>
+    <p class="hint" style="margin-bottom:10px">按上架位置整包生成（主图5张/详情8屏/小红书6张/赛马6变体），文件按位置命名，可断点重跑失败单张。</p>
+    <div class="bcards" id="bcards"></div>
+    <button id="bgo" disabled>📦 生成整包</button>
+    <div class="bshots" id="bshots"></div>
   </div>
 
   <button class="go" id="go" disabled>⚡ 开始生成（每张约 30-60 秒）</button>
@@ -169,6 +196,64 @@ $("go").onclick = async () => {
   log(`\n■ 完成 ${done.length}/${presets.length}。图片在 output/images/，质检待跑 03（工作流一键含质检）。`);
   $("go").disabled=false;
 };
+
+// ── 套餐模式 ──
+let bundleSel = null, bundleData = [];
+async function loadBundles(){
+  if(!pid) return;
+  const r = await fetch(`${API}/bundles?product_id=${pid}`).then(r=>r.json()).catch(()=>({bundles:[]}));
+  bundleData = r.bundles || [];
+  $("bcards").innerHTML = bundleData.map(b => {
+    const runnable = b.plan.total_runnable, total = b.plan.total;
+    const cls = runnable===0 ? "bc no" : "bc";
+    return `<div class="${cls}" data-id="${b.bundle_id}">
+      <b>${b.name}</b>
+      <div class="meta">
+        ${b.desc}<br>
+        槽位 ${runnable}/${total} 可跑 ·
+        <span class="cost">≈${b.plan.estimated_credits} credits</span> ·
+        ≈${Math.round(b.plan.estimated_seconds/60)} 分钟
+        ${runnable===0?'<br><span style="color:var(--bad)">需先上传白底图</span>':""}
+      </div>
+    </div>`;
+  }).join("");
+  document.querySelectorAll(".bc").forEach(el=>el.onclick=()=>{
+    if(el.classList.contains("no")) return;
+    document.querySelectorAll(".bc").forEach(e=>e.classList.remove("on"));
+    el.classList.add("on"); bundleSel = el.dataset.id; $("bgo").disabled=false;
+    log(`选中套餐: ${bundleSel}`);
+    loadBundleStatus();
+  });
+}
+async function loadBundleStatus(){
+  const st = await fetch(`${API}/bundle/${pid}/${bundleSel}/status`).then(r=>r.json()).catch(()=>({}));
+  if(st.state && st.state!=="not_started"){
+    log(`[${bundleSel}] 上次: ${st.state} ✓${st.summary?.ok||0} ✗${st.summary?.failed||0} 跳过${st.summary?.skipped||0}`);
+  }
+}
+$("bgo").onclick = async ()=>{
+  if(!bundleSel) return;
+  $("bgo").disabled = true;
+  log(`\n▶ 整包生成: ${pid} × ${bundleSel}`);
+  const r = await fetch(`${API}/generate/bundle`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({product_id:pid,bundle:bundleSel})});
+  const j = await r.json().catch(()=>({}));
+  if(r.ok){
+    log(`✓ 完成: 成功${j.summary.ok} 失败${j.summary.failed} 跳过${j.summary.skipped} 用时${Math.round(j.summary.elapsed_sec)}s`);
+    showBundleShots(j.generated||[]);
+  } else log(`✗ ${j.detail||r.status}（失败槽位可重跑：再点一次会只跑失败的）`);
+  $("bgo").disabled = false;
+  loadBundles();
+};
+function showBundleShots(paths){
+  $("bshots").innerHTML = paths.map(p=>
+    `<div class="bshot"><img src="${API}/file?path=${encodeURIComponent(p)}" loading="lazy">
+     <div class="m"><span>${p.split("/").pop()}</span></div></div>`).join("");
+}
+// 商品切换时刷新套餐
+const _origLoadAssets = loadAssets;
+loadAssets = async function(){ await _origLoadAssets(); loadBundles(); };
+
 </script>
 </body>
 </html>

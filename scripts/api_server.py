@@ -202,6 +202,59 @@ def serve_output_file(path: str):
     return FileResponse(f)
 
 
+
+
+# ── 套餐（Bundle）批量生产 ─────────────────────────────────────
+from scripts.pipeline import bundles as bundles_lib
+from scripts.pipeline import runner as runner_lib
+
+
+@app.get("/bundles")  # 套餐列表 + 该商品的实时可跑性/成本预估
+def list_bundles(product_id: str = "P001"):
+    out = []
+    for bid in bundles_lib.BUNDLES:
+        b = bundles_lib.get_bundle(bid)
+        plan = bundles_lib.plan_bundle(product_id, bid, assets_dir=ASSETS_DIR)
+        out.append({"bundle_id": bid, "name": b["name"], "desc": b.get("desc", ""),
+                    "slots": len(b["slots"]),
+                    "plan": {"total": len(plan.slots), "total_runnable": plan.total_runnable,
+                             "estimated_credits": plan.estimated_credits,
+                             "estimated_seconds": plan.estimated_seconds}})
+    return {"bundles": out}
+
+
+@app.post("/generate/bundle")  # 执行套餐（retry_failed=true 只重跑失败槽位）
+def generate_bundle(body: dict):
+    pid = body.get("product_id", "")
+    bid = body.get("bundle", "")
+    if bid not in bundles_lib.BUNDLES:
+        return JSONResponse({"detail": f"未知套餐 {bid}"}, status_code=400)
+    plan = bundles_lib.plan_bundle(pid, bid, assets_dir=ASSETS_DIR,
+                                   variants=int(body.get("variants", 1)))
+    if plan.total_runnable == 0:
+        return JSONResponse({"detail": f"商品 {pid} 无可跑槽位（缺白底图？），先上传素材"},
+                            status_code=400)
+    out_dir = ROOT / "output" / "bundles" / f"{pid}_{bid}"
+    manifest = runner_lib.run_bundle(plan, out_dir=out_dir,
+                                     retry_failed=bool(body.get("retry_failed")))
+    ok = manifest["summary"]["ok"]
+    if ok == 0:
+        return JSONResponse(manifest, status_code=502)
+    return manifest
+
+
+@app.get("/bundle/{pid}/{bid}/status")  # 查询某套餐 manifest
+def bundle_status(pid: str, bid: str):
+    mf = ROOT / "output" / "bundles" / f"{pid}_{bid}" / "manifest.json"
+    if not mf.exists():
+        return {"state": "not_started"}
+    m = json.loads(mf.read_text(encoding="utf-8"))
+    s = m.get("summary", {})
+    m["state"] = ("done" if s.get("failed", 1) == 0 and s.get("ok", 0) > 0
+                  else "partial" if s.get("ok", 0) > 0 else "failed")
+    return m
+
+
 if __name__ == "__main__":
     import os
     import uvicorn
