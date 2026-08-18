@@ -657,8 +657,15 @@ def generate_custom(body: dict):
     if pid:
         ad = ASSETS_DIR / pid
         if ad.exists():
-            for kind in ("ref", "flat", "white", "model"):  # 参照图优先
-                refs.extend(sorted(ad.glob(f"{kind}_*")))
+            only = body.get("refs_only") or []
+            if only:  # 指定文件名（可带或不带序号前缀匹配）
+                for name in only:
+                    hits = sorted(ad.glob(name)) or sorted(
+                        p2 for p2 in ad.glob("*") if p2.name.startswith(name.rsplit(".", 1)[0]))
+                    refs.extend(hits)
+            else:
+                for kind in ("ref", "flat", "white", "model"):  # 参照图优先
+                    refs.extend(sorted(ad.glob(f"{kind}_*")))
     from scripts.pipeline import imagegen as _ig
     from scripts.pipeline.config import Config as _Cfg
     import asyncio as _aio
