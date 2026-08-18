@@ -56,7 +56,7 @@ a{color:var(--gold2)}
 </style></head><body><div class="lightbox" id="lb" onclick="this.style.display='none'"><img id="lbimg"></div>
 <div class="wrap">
 <h1>🎨 电商图工厂 · 技能包控制台
-  <span id="ver" style="font-size:10px;color:#b8a888;font-weight:400;vertical-align:middle;margin-left:8px">v1.3</span></h1>
+  <span id="ver" style="font-size:10px;color:#b8a888;font-weight:400;vertical-align:middle;margin-left:8px">v1.4</span></h1>
 <div class="sub">选技能包 + 商品素材 → 一键生成（双锚定：商品特写 + 模特三视图 + 套图）</div>
 <div class="card" style="margin-bottom:16px">
   <h2>📥 商品素材上传 <span class="kind-badge" id="assets-row">未加载</span></h2>
@@ -170,15 +170,27 @@ for(const k of ['flat','model','ref']){
   z.addEventListener('dragover',ev=>{ev.preventDefault();ev.dataTransfer.dropEffect='copy';z.classList.add('drag')});
   z.addEventListener('dragleave',ev=>{if(!z.contains(ev.relatedTarget))z.classList.remove('drag')});
   z.addEventListener('drop',async ev=>{ev.preventDefault();z.classList.remove('drag');
+    log(`⬇ drop事件触发(${k})`);
     let fs=[...(ev.dataTransfer?.files||[])];
+    log(`  dataTransfer.files=${fs.length}个`);
     if(!fs.length){ // 兜底:某些App(微信)拖出仅items可读
       for(const it of (ev.dataTransfer?.items||[])){
         if(it.kind==='file'){const f=it.getAsFile();if(f)fs.push(f)}
       }
+      log(`  items兜底后=${fs.length}个`);
     }
     if(!fs.length){log('⚠ 未识别到文件,请改用点击选择上传');return}
     for(const f of fs){await uploadOne(k,f)}});
+  // 粘贴兜底: 复制文件后在页面直接Cmd+V,归入当前选中格子
+  z.addEventListener('click',()=>{curKind=k;z.style.boxShadow='0 0 0 2px #c9a227';
+    document.querySelectorAll('.upload-zone').forEach(o=>{if(o!==z)o.style.boxShadow=''})});
 }
+document.addEventListener('paste',async ev=>{
+  const files=[...(ev.clipboardData?.files||[])];
+  if(!files.length)return;
+  log(`📋 粘贴上传 ${files.length}个文件 → ${curKind||'flat(默认)'}`);
+  for(const f of files){await uploadOne(curKind||'flat',f)}
+});
 // 全局兜底:阻止浏览器默认"拖入打开文件",让拖拽在整个页面都安全
 for(const et of ['dragover','drop']){
   document.addEventListener(et,ev=>{ev.preventDefault()});
