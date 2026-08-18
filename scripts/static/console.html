@@ -56,7 +56,7 @@ a{color:var(--gold2)}
 </style></head><body><div class="lightbox" id="lb" onclick="this.style.display='none'"><img id="lbimg"></div>
 <div class="wrap">
 <h1>🎨 电商图工厂 · 技能包控制台
-  <span id="ver" style="font-size:10px;color:#b8a888;font-weight:400;vertical-align:middle;margin-left:8px">v1.5</span></h1>
+  <span id="ver" style="font-size:10px;color:#b8a888;font-weight:400;vertical-align:middle;margin-left:8px">v1.6</span></h1>
 <div class="sub">选技能包 + 商品素材 → 一键生成（双锚定：商品特写 + 模特三视图 + 套图）</div>
 <div class="card" style="margin-bottom:16px">
   <h2>📥 商品素材上传 <span class="kind-badge" id="assets-row">未加载</span></h2>
@@ -90,7 +90,11 @@ a{color:var(--gold2)}
 </div>
 <div class="grid">
   <div class="card">
-    <h2>🚀 发起生成</h2>
+    <h2>🚀 发起生成 <span style="float:right;font-size:12px">
+      <label style="cursor:pointer"><input type="radio" name="mode" value="skill" checked onchange="toggleMode()"> 技能包模式</label>
+      <label style="cursor:pointer;margin-left:10px"><input type="radio" name="mode" value="custom" onchange="toggleMode()"> 自定义模式</label>
+    </span></h2>
+    <div id="mode-skill">
     <label style="font-size:12px;color:var(--sub)">技能包</label>
     <select id="skill"></select>
     <div style="height:10px"></div>
@@ -99,6 +103,19 @@ a{color:var(--gold2)}
     <label style="font-size:12px;color:var(--sub);display:flex;gap:6px;align-items:center;margin-top:12px">
       <input type="checkbox" id="retry" style="width:auto"> 只重跑失败槽位（retry_failed）
     </label>
+    </div>
+    <div id="mode-custom" style="display:none">
+      <label style="font-size:12px;color:var(--sub)">生成提示词（不走技能包，参考图用上方已上传素材）</label>
+      <textarea id="cgen-prompt" style="min-height:120px" placeholder="粘贴你的完整提示词——以参考图为唯一产品依据…"></textarea>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <div style="flex:1"><label style="font-size:12px;color:var(--sub)">张数(1-4)</label>
+          <select id="cgen-count" style="width:100%"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+        <div style="flex:1"><label style="font-size:12px;color:var(--sub)">比例</label>
+          <select id="cgen-size" style="width:100%"><option selected>4:5</option><option>1:1</option><option>9:16</option><option>3:4</option><option>16:9</option></select></div>
+        <div style="flex:2"><label style="font-size:12px;color:var(--sub)">参考图（留空=全部素材）</label>
+          <input type="text" id="cgen-refs" placeholder="如 flat_4.png, flat_5.png" style="width:100%"></div>
+      </div>
+    </div>
     <button id="go" onclick="start()">▶ 开始生成</button>
     <div class="log" id="log"></div>
   </div>
@@ -123,12 +140,40 @@ async function loadSkills(){
   sel.innerHTML = d.skills.map(s=>`<option value="${s.skill_id}">${s.name}（${s.slots}槽位）</option>`).join('');
 }
 function log(m){const el=document.getElementById('log');el.innerHTML+=m+'<br>';el.scrollTop=el.scrollHeight}
+function toggleMode(){
+  const custom=document.querySelector('input[name=mode]:checked').value==='custom';
+  document.getElementById('mode-skill').style.display=custom?'none':'block';
+  document.getElementById('mode-custom').style.display=custom?'block':'none';
+}
 async function start(){
-  const skill=document.getElementById('skill').value;
   const pid=document.getElementById('pid').value.trim();
-  const retry=document.getElementById('retry').checked;
-  if(!skill||!pid){log('⚠ 请选技能包并填商品ID');return}
+  const custom=document.querySelector('input[name=mode]:checked').value==='custom';
   document.getElementById('go').disabled=true;
+  if(custom){
+    const prompt=document.getElementById('cgen-prompt').value.trim();
+    if(!pid){log('⚠ 请填商品ID');document.getElementById('go').disabled=false;return}
+    if(!prompt){log('⚠ 请填写生成提示词');document.getElementById('go').disabled=false;return}
+    const count=+document.getElementById('cgen-count').value;
+    const size=document.getElementById('cgen-size').value;
+    const refsRaw=document.getElementById('cgen-refs').value.trim();
+    const refs_only=refsRaw?refsRaw.split(/[,，\s]+/).filter(Boolean):undefined;
+    log(`→ 自定义生成: ${count}张 ${size}${refs_only?' 指定参考:'+refs_only.length+'张':' 全部素材'}`);
+    const t0=Date.now();
+    try{
+      const r=await fetch('/generate/custom',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({prompt,product_id:pid,count,size,refs_only})});
+      const d=await r.json();
+      if(!r.ok){log('✗ '+(d.detail||r.status));document.getElementById('go').disabled=false;return}
+      const imgs=(d.images||[]).map(p=>({url:'/file?path='+p,path:p}));
+      log(`✓ 完成 ${d.count}张 (${((Date.now()-t0)/1000).toFixed(0)}s) 参考图: ${(d.refs_used||[]).join(',')}`);
+      renderWall(imgs);
+    }catch(e){log('✗ '+e.message)}
+    document.getElementById('go').disabled=false;
+    return;
+  }
+  const skill=document.getElementById('skill').value;
+  const retry=document.getElementById('retry').checked;
+  if(!skill||!pid){log('⚠ 请选技能包并填商品ID');document.getElementById('go').disabled=false;return}
   log(`→ 提交: ${skill} × ${pid}${retry?' (retry)':''}`);
   const r=await fetch('/generate/skill/async',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({skill_id:skill,product_id:pid,retry_failed:retry})});
