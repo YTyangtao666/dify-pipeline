@@ -200,7 +200,11 @@ async function uploadOne(kind,f){
   const pid=document.getElementById('pid').value.trim();
   if(!pid){alert('请先填商品ID');return}
   const fd=new FormData();fd.append('file',f);
-  const r=await fetch(`/assets/${pid}/${kind}`,{method:'POST',body:fd});
+  let r,tries=0;
+  while(tries<3){ // 网络重试
+    try{ r=await fetch(`/assets/${pid}/${kind}`,{method:'POST',body:fd}); break }
+    catch(e){ tries++; if(tries>=3){log(`✗ 网络失败: ${f.name}`);return} await new Promise(s=>setTimeout(s,800)) }
+  }
   if(r.ok){log(`✓ ${kind} ← ${f.name}`);
     const z=document.getElementById('z-'+kind);
     z.style.outline='3px solid #7fb069';z.style.outlineOffset='2px';

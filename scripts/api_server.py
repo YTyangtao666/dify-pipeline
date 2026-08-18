@@ -155,6 +155,10 @@ def _load_custom_prompt(pid: str) -> str:
     return ""
 
 
+import threading as _threading
+_ASSET_LOCK = _threading.Lock()
+
+
 @app.post("/assets/{pid}/{kind}")  # kind: white/model/flat/scene/ref（分类结构化素材）
 async def upload_asset(pid: str, kind: str, file: UploadFile = File(...)):
     if kind not in ("white", "model", "flat", "scene", "ref"):
@@ -164,10 +168,14 @@ async def upload_asset(pid: str, kind: str, file: UploadFile = File(...)):
         raise HTTPException(415, f"仅支持 png/jpeg/webp，收到 {file.content_type}")
     d = ASSETS_DIR / pid
     d.mkdir(parents=True, exist_ok=True)
-    # 同类资产多张：white_1.png white_2.png …
-    n = len(list(d.glob(f"{kind}_*"))) + 1
-    dest = d / f"{kind}_{n}{ext}"
-    dest.write_bytes(await file.read())
+    # 同类资产多张：同步锁 + 唯一编号（async 交错下 glob 计数会撞号覆盖）
+    content = await file.read()
+    with _ASSET_LOCK:  # threading.Lock：临界区无 await，跨请求安全
+        n = len(list(d.glob(f"{kind}_*"))) + 1
+        while (d / f"{kind}_{n}{ext}").exists():
+            n += 1
+        dest = d / f"{kind}_{n}{ext}"
+        dest.write_bytes(content)  # 锁内落盘,杜绝竞态
     try:
         rel = str(dest.relative_to(ROOT))
     except ValueError:  # 测试环境 ASSETS_DIR 在 /tmp

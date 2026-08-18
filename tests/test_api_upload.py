@@ -99,3 +99,23 @@ def test_skills_list_filters_test_packs():
     for s in d["skills"]:
         assert not s["skill_id"].startswith("test_"), s
         assert not s["skill_id"].startswith("style_"), s
+
+
+def test_concurrent_uploads_no_overwrite(tmp_path, monkeypatch):
+    """并发上传不覆盖：10并发 → 10个文件。"""
+    import io
+    from fastapi.testclient import TestClient
+    from scripts import api_server as srv
+    monkeypatch.setattr(srv, "ASSETS_DIR", tmp_path)
+    monkeypatch.setattr(srv, "ROOT", tmp_path)
+    client = TestClient(srv.app)
+    png = b"\x89PNG\r\n\x1a\n" + b"x" * 100
+    import concurrent.futures as cf
+    def up(i):
+        return client.post("/assets/PC/flat",
+                           files={"file": (f"s{i}.png", io.BytesIO(png), "image/png")}).status_code
+    with cf.ThreadPoolExecutor(10) as ex:
+        codes = list(ex.map(up, range(10)))
+    assert all(c == 200 for c in codes)
+    files = list((tmp_path / "PC").glob("flat_*.png"))
+    assert len(files) == 10, f"并发覆盖! 只剩{len(files)}个"
