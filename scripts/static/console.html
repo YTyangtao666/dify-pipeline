@@ -165,10 +165,17 @@ document.getElementById('fp').addEventListener('change',async e=>{
 });
 for(const k of ['flat','model','ref']){
   const z=document.getElementById('z-'+k);
-  z.addEventListener('dragover',ev=>{ev.preventDefault();z.classList.add('drag')});
-  z.addEventListener('dragleave',()=>z.classList.remove('drag'));
+  z.addEventListener('dragenter',ev=>{ev.preventDefault();z.classList.add('drag')});
+  z.addEventListener('dragover',ev=>{ev.preventDefault();ev.dataTransfer.dropEffect='copy';z.classList.add('drag')});
+  z.addEventListener('dragleave',ev=>{if(!z.contains(ev.relatedTarget))z.classList.remove('drag')});
   z.addEventListener('drop',async ev=>{ev.preventDefault();z.classList.remove('drag');
-    for(const f of [...ev.dataTransfer.files]){await uploadOne(k,f)}});
+    const fs=[...(ev.dataTransfer?.files||[])];
+    if(!fs.length){log('⚠ 未识别到文件(某些App拖出不可读),请改用点击选择');return}
+    for(const f of fs){await uploadOne(k,f)}});
+}
+// 全局兜底:阻止浏览器默认"拖入打开文件",让拖拽在整个页面都安全
+for(const et of ['dragover','drop']){
+  document.addEventListener(et,ev=>{ev.preventDefault()});
 }
 function pick(k){curKind=k;document.getElementById('fp').click()}
 async function uploadOne(kind,f){
