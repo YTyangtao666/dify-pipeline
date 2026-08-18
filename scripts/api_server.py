@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -381,6 +381,150 @@ def generate_by_skill(body: dict):
     if ok == 0:
         return JSONResponse(manifest, status_code=502)
     return manifest
+
+
+
+
+# ── 异步任务系统（技能包生成不阻塞 HTTP）──
+import threading
+import uuid
+
+TASKS: dict[str, dict] = {}
+_TASKS_LOCK = threading.Lock()
+
+
+def _run_skill_task(task_id: str, body: dict):
+    """后台线程执行技能包生成，进度写 TASKS。"""
+    with _TASKS_LOCK:
+        TASKS[task_id]["state"] = "running"
+    try:
+        # 复用同步端点逻辑：直接调用其函数体（构造 Request 代价高，改为进程内直调 run）
+        skill_id = body.get("skill_id", "")
+        pid = body.get("product_id", "")
+        pack = None
+        for data_dir in (ROOT / "data", ASSETS_DIR):
+            try:
+                pack = style_learner_lib.load_skill_pack(skill_id, data_dir=data_dir)
+                break
+            except FileNotFoundError:
+                continue
+        if pack is None:
+            raise ValueError(f"技能包不存在: {skill_id}")
+
+        adir = ASSETS_DIR / pid
+        have = set()
+        if adir.exists():
+            for kind in ("white", "flat", "model", "onbody"):
+                if list(adir.glob(f"{kind}_*")):
+                    have.add(kind)
+        runnable = [s for s in pack["slots"] if set(s["input_deps"]) <= have]
+
+        titles = {}
+        products_f = ROOT / "data" / "products.json"
+        if products_f.exists():
+            titles = {p["product_id"]: p.get("title", "")
+                      for p in json.loads(products_f.read_text(encoding="utf-8"))}
+        selling = []
+        sp_f = ROOT / "data" / f"selling_points_{pid}.json"
+        if sp_f.exists():
+            try:
+                selling = [t["point"] for t in
+                           json.loads(sp_f.read_text(encoding="utf-8")).get("top3", [])]
+            except Exception:  # noqa: BLE001
+                pass
+        sp_block = ("画面需视觉可见地传达卖点：" + "；".join(selling[:3]) + "。") if selling else ""
+
+        from scripts.pipeline.bundles import BundlePlan, SlotPlan
+        from scripts.pipeline import runner as _r
+        slots = [SlotPlan(pos=s["pos"], role=s["role"], preset=f"skill:{skill_id}:{s['pos']}",
+                          size=s["size"], filename=f"{pid}_{s['pos']:02d}_{s['role']}.png",
+                          runnable=True) for s in runnable]
+        plan = BundlePlan(bundle_id=f"skill_{skill_id}", product_id=pid, slots=slots)
+        out_dir = ROOT / "output" / "bundles" / f"{pid}_{skill_id}"
+
+        _orig = _r._build_slot_prompt
+
+        def _skill_prompt(plan2, slot, compose_lib, _pack=pack, _titles=titles,
+                          _sp=sp_block, _orig=_orig):
+            for s in _pack["slots"]:
+                if s["pos"] == slot.pos:
+                    return s["template"].format(
+                        title=_titles.get(plan2.product_id, plan2.product_id),
+                        selling_points=_sp)
+            return _orig(plan2, slot, compose_lib)
+
+        _r._build_slot_prompt = _skill_prompt
+
+        def _progress(kind, slot):
+            with _TASKS_LOCK:
+                t = TASKS.get(task_id)
+                if t:
+                    t["done_count"] += 1
+                    t["progress"] = f"{t['done_count']}/{t['total']}"
+
+        try:
+            manifest = runner_lib.run_bundle(plan, out_dir=out_dir,
+                                             retry_failed=bool(body.get("retry_failed")),
+                                             on_progress=_progress)
+        finally:
+            _r._build_slot_prompt = _orig
+        with _TASKS_LOCK:
+            TASKS[task_id].update(state="done", manifest=manifest,
+                                  summary=manifest.get("summary", {}))
+    except Exception as e:  # noqa: BLE001
+        with _TASKS_LOCK:
+            TASKS[task_id].update(state="failed", error=str(e)[:300])
+
+
+@app.post("/generate/skill/async")  # 异步一键生成 → task_id
+def generate_by_skill_async(body: dict):
+    task_id = f"t_{uuid.uuid4().hex[:10]}"
+    total = 0
+    try:
+        pack = style_learner_lib.load_skill_pack(body.get("skill_id", ""), data_dir=ROOT / "data")
+    except FileNotFoundError:
+        try:
+            pack = style_learner_lib.load_skill_pack(body.get("skill_id", ""), data_dir=ASSETS_DIR)
+        except FileNotFoundError:
+            return JSONResponse({"detail": f"技能包不存在: {body.get('skill_id')}"}, status_code=404)
+    total = len(pack["slots"]) + 2  # 槽位 + 00A/00B 锚定图余量
+    with _TASKS_LOCK:
+        TASKS[task_id] = {"state": "queued", "created": _time_mod.time(),
+                          "total": total, "done_count": 0, "progress": f"0/{total}",
+                          "body": body}
+    threading.Thread(target=_run_skill_task, args=(task_id, body), daemon=True).start()
+    return {"task_id": task_id, "poll": f"/tasks/{task_id}"}
+
+
+@app.get("/tasks/{task_id}")
+def get_task(task_id: str):
+    with _TASKS_LOCK:
+        t = TASKS.get(task_id)
+        if not t:
+            return JSONResponse({"detail": "任务不存在"}, status_code=404)
+        out = {k: v for k, v in t.items() if k != "body"}
+        imgs = []
+        m = t.get("manifest")
+        if m:
+            for gp in m.get("generated", []):
+                rel = str(Path(gp).relative_to(ROOT)) if str(gp).startswith(str(ROOT)) else gp
+                imgs.append({"path": rel, "url": f"/file?path={rel}"})
+        out["images"] = imgs
+        return out
+
+
+@app.get("/tasks")  # 任务列表(最近20)
+def list_tasks():
+    with _TASKS_LOCK:
+        items = sorted(TASKS.items(), key=lambda kv: -kv[1].get("created", 0))[:20]
+        return {"tasks": [{**{"task_id": k}, **{kk: vv for kk, vv in v.items()
+                          if kk not in ("body", "manifest")}} for k, v in items]}
+
+
+@app.get("/console")  # 极简控制台 UI
+def console_ui():
+    html_path = ROOT / "scripts" / "static" / "console.html"
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

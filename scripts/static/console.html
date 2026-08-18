@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>电商图工厂 · 控制台</title>
+<style>
+:root{--bg:#faf6ee;--card:#fffdf8;--line:#e8dcc8;--gold:#c9a227;--gold2:#6b5327;--txt:#3d3425;--sub:#8a7a5c;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:'PingFang SC',-apple-system,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 22px}
+h1{color:var(--gold2);font-size:22px;border-bottom:2px solid var(--gold);padding-bottom:10px}
+.sub{font-size:12px;color:var(--sub);margin:8px 0 22px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+.card h2{font-size:15px;color:var(--gold2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+select,input[type=text]{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;
+  background:#fff;font-size:14px;color:var(--txt);outline:none}
+select:focus,input:focus{border-color:var(--gold)}
+button{background:linear-gradient(135deg,#c9a227,#a8842f);color:#fff;border:none;border-radius:8px;
+  padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px;width:100%}
+button:hover{filter:brightness(1.08)}
+button:disabled{background:#d8cbb0;cursor:not-allowed}
+.progress-wrap{background:#f0e8d8;border-radius:99px;height:10px;overflow:hidden;margin:10px 0}
+.progress-bar{background:linear-gradient(90deg,#c9a227,#e0be5a);height:100%;width:0;transition:width .6s}
+.slot-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+.slot{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#f6f0e2;aspect-ratio:3/4}
+.slot img{width:100%;height:100%;object-fit:cover;display:block}
+.slot .tag{position:absolute;left:0;right:0;bottom:0;background:rgba(61,52,37,.72);color:#fdf8ef;
+  font-size:11px;padding:4px 6px;text-align:center}
+.slot.pending{display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:12px}
+.status-line{font-size:13px;color:var(--sub);display:flex;justify-content:space-between;margin-top:8px}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:600}
+.b-done{background:#e8f3e2;color:#4a7c3a}.b-run{background:#fdf3d9;color:#9a7b1c}
+.b-fail{background:#f9e3e3;color:#b05252}.b-queued{background:#eee8dd;color:#8a7a5c}
+.log{font-size:12px;color:var(--sub);line-height:1.8;margin-top:10px;max-height:150px;overflow-y:auto}
+a{color:var(--gold2)}
+</style></head><body><div class="wrap">
+<h1>🎨 电商图工厂 · 技能包控制台</h1>
+<div class="sub">选技能包 + 商品素材 → 一键生成（双锚定：商品特写 + 模特三视图 + 套图）</div>
+<div class="grid">
+  <div class="card">
+    <h2>🚀 发起生成</h2>
+    <label style="font-size:12px;color:var(--sub)">技能包</label>
+    <select id="skill"></select>
+    <div style="height:10px"></div>
+    <label style="font-size:12px;color:var(--sub)">商品ID</label>
+    <input type="text" id="pid" placeholder="如 T001" value="T001">
+    <label style="font-size:12px;color:var(--sub);display:flex;gap:6px;align-items:center;margin-top:12px">
+      <input type="checkbox" id="retry" style="width:auto"> 只重跑失败槽位（retry_failed）
+    </label>
+    <button id="go" onclick="start()">▶ 开始生成</button>
+    <div class="log" id="log"></div>
+  </div>
+  <div class="card">
+    <h2>📋 任务进度</h2>
+    <div class="status-line"><span id="tstate"><span class="badge b-queued">未开始</span></span>
+      <span id="tprog">-</span></div>
+    <div class="progress-wrap"><div class="progress-bar" id="bar"></div></div>
+    <div class="status-line"><span>已生成</span><span id="tok">0</span></div>
+  </div>
+</div>
+<div class="card" style="margin-top:16px">
+  <h2>🖼️ 产物图片墙</h2>
+  <div class="slot-list" id="wall"><div class="slot pending">发起生成后图片会出现在这里</div></div>
+</div>
+</div>
+<script>
+let timer=null, tid=null;
+async function loadSkills(){
+  const r = await fetch('/skills'); const d = await r.json();
+  const sel = document.getElementById('skill');
+  sel.innerHTML = d.skills.map(s=>`<option value="${s.skill_id}">${s.name}（${s.slots}槽位）</option>`).join('');
+}
+function log(m){const el=document.getElementById('log');el.innerHTML+=m+'<br>';el.scrollTop=el.scrollHeight}
+async function start(){
+  const skill=document.getElementById('skill').value;
+  const pid=document.getElementById('pid').value.trim();
+  const retry=document.getElementById('retry').checked;
+  if(!skill||!pid){log('⚠ 请选技能包并填商品ID');return}
+  document.getElementById('go').disabled=true;
+  log(`→ 提交: ${skill} × ${pid}${retry?' (retry)':''}`);
+  const r=await fetch('/generate/skill/async',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({skill_id:skill,product_id:pid,retry_failed:retry})});
+  if(!r.ok){log('✗ '+((await r.json()).detail||r.status));document.getElementById('go').disabled=false;return}
+  tid=(await r.json()).task_id;
+  log('✓ 任务已受理 '+tid);
+  timer=setInterval(poll,2000);
+}
+async function poll(){
+  const r=await fetch('/tasks/'+tid); if(!r.ok)return;
+  const t=await r.json();
+  const map={running:['运行中','b-run'],done:['完成','b-done'],failed:['失败','b-fail'],queued:['排队','b-queued']};
+  const [txt,cls]=map[t.state]||['?','b-queued'];
+  document.getElementById('tstate').innerHTML=`<span class="badge ${cls}">${txt}</span>`;
+  document.getElementById('tprog').textContent=t.progress||'-';
+  const total=t.total||1;
+  document.getElementById('bar').style.width=Math.min(100,(t.done_count||0)/total*100)+'%';
+  document.getElementById('tok').textContent=t.done_count||0;
+  if(t.state==='done'||t.state==='failed'){
+    clearInterval(timer);document.getElementById('go').disabled=false;
+    if(t.error)log('✗ '+t.error);
+    renderWall(t.images||[]);
+    log(t.state==='done'?'✓ 全部完成':'✗ 有失败项,可勾选retry重跑');
+  } else { renderWall(t.images||[]); }
+}
+function renderWall(imgs){
+  const w=document.getElementById('wall');
+  if(!imgs.length){return}
+  w.innerHTML=imgs.map(i=>`<div class="slot"><img src="${i.url}" loading="lazy">
+    <div class="tag">${(i.path.split('/').pop()||'').replace(/^T001_/,'').replace('.png','')}</div></div>`).join('');
+}
+loadSkills();
+</script></body></html>
