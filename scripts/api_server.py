@@ -643,6 +643,51 @@ def list_tasks():
                           if kk not in ("body", "manifest")}} for k, v in items]}
 
 
+@app.post("/generate/custom")  # 自定义 prompt 直生成（用户提示词单发,不走路由技能包）
+def generate_custom(body: dict):
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        return JSONResponse({"detail": "prompt 不能为空"}, status_code=400)
+    if len(prompt) > 3000:
+        return JSONResponse({"detail": "prompt 超过3000字"}, status_code=400)
+    count = max(1, min(4, int(body.get("count", 1))))
+    size = body.get("size") or "4:5"
+    pid = body.get("product_id") or ""
+    refs = []
+    if pid:
+        ad = ASSETS_DIR / pid
+        if ad.exists():
+            for kind in ("ref", "flat", "white", "model"):  # 参照图优先
+                refs.extend(sorted(ad.glob(f"{kind}_*")))
+    from scripts.pipeline import imagegen as _ig
+    from scripts.pipeline.config import Config as _Cfg
+    import asyncio as _aio
+    _gi, _bc = _ig.generate_image, _ig.build_client
+    cfg = _Cfg.from_env()
+    out_dir = ROOT / "output" / "custom"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    import time as _tt
+
+    async def _run_all():
+        outs = []
+        async with _bc(cfg) as client:
+            for i in range(count):
+                ts = _tt.strftime("%H%M%S")
+                out = out_dir / f"custom_{ts}_{i + 1}.png"
+                await _gi(cfg, prompt, out, size=size, interval=1.0,
+                          client=client, reference_images=refs)
+                outs.append(str(out.relative_to(ROOT)) if str(out).startswith(str(ROOT)) else str(out))
+        return outs
+
+    try:
+        images = _aio.run(_run_all())
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"detail": f"生成失败: {str(e)[:200]}"}, status_code=502)
+    return {"count": len(images), "images": images,
+            "urls": [f"/file?path={p}" for p in images],
+            "refs_used": [str(r.name) for r in refs]}
+
+
 @app.get("/console")  # 极简控制台 UI
 def console_ui():
     html_path = ROOT / "scripts" / "static" / "console.html"
