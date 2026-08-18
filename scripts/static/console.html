@@ -223,7 +223,7 @@ async function loadAssets(){
     (d.files||[]).filter(n=>n.startsWith(k+'_')).forEach(n=>{
       const w=document.createElement('div');w.className='thumb-wrap';
       const img=document.createElement('img');
-      img.src=`/assets-file/${pid}/${n}`;
+      img.src=`/assets-file/${pid}/${n}?v=${Date.now()}`;  // 破缓存
       const del=document.createElement('button');del.className='thumb-del';del.textContent='×';
       del.title='删除 '+n;
       del.onclick=async ev=>{ev.stopPropagation();

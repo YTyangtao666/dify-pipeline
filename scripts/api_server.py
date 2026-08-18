@@ -188,7 +188,8 @@ def serve_asset_file(pid: str, name: str):
     f = (ASSETS_DIR / pid / name).resolve()
     if not str(f).startswith(str(ASSETS_DIR.resolve())) or not f.exists() or f.is_dir():
         raise HTTPException(404, "not found")
-    return FileResponse(f)
+    # no-store：删除重传同名文件后浏览器不得用旧缓存（同名不同内容显示旧图的坑）
+    return FileResponse(f, headers={"Cache-Control": "no-store, max-age=0"})
 
 
 @app.get("/assets/{pid}")
