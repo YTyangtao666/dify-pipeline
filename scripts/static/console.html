@@ -30,10 +30,49 @@ button:disabled{background:#d8cbb0;cursor:not-allowed}
 .b-done{background:#e8f3e2;color:#4a7c3a}.b-run{background:#fdf3d9;color:#9a7b1c}
 .b-fail{background:#f9e3e3;color:#b05252}.b-queued{background:#eee8dd;color:#8a7a5c}
 .log{font-size:12px;color:var(--sub);line-height:1.8;margin-top:10px;max-height:150px;overflow-y:auto}
+.upload-zone{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;
+  cursor:pointer;transition:border-color .2s;background:#fefcf7}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--gold)}
+.upload-zone .zt{font-size:13px;color:var(--gold2);font-weight:600}
+.upload-zone .zd{font-size:11px;color:var(--sub);margin-top:4px}
+.upl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.thumbs img{width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.kind-badge{font-size:11px;background:#f0e8d8;border-radius:99px;padding:2px 8px;color:var(--sub)}
+textarea{width:100%;min-height:64px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+  background:#fff;font-size:13px;color:var(--txt);resize:vertical;font-family:inherit}
+.assets-row{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--sub);margin-top:8px;flex-wrap:wrap}
 a{color:var(--gold2)}
 </style></head><body><div class="wrap">
 <h1>🎨 电商图工厂 · 技能包控制台</h1>
 <div class="sub">选技能包 + 商品素材 → 一键生成（双锚定：商品特写 + 模特三视图 + 套图）</div>
+<div class="card" style="margin-bottom:16px">
+  <h2>📥 商品素材上传 <span class="kind-badge" id="assets-row">未加载</span></h2>
+  <div class="upl-grid">
+    <div class="upload-zone" id="z-flat" onclick="pick('flat')">
+      <div class="zt">① 商品白底图/平铺图</div>
+      <div class="zd">点击或拖拽 · 可多张 · png/jpeg/webp</div>
+      <div class="thumbs" id="th-flat"></div>
+    </div>
+    <div class="upload-zone" id="z-model" onclick="pick('model')">
+      <div class="zt">② 模特/场景图</div>
+      <div class="zd">模特照·模特场景·纯场景 · 可多张</div>
+      <div class="thumbs" id="th-model"></div>
+    </div>
+    <div class="upload-zone" id="z-ref" onclick="pick('ref')">
+      <div class="zt">③ 参照图</div>
+      <div class="zd">风格/构图参考 · 只借鉴氛围</div>
+      <div class="thumbs" id="th-ref"></div>
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <label style="font-size:12px;color:var(--sub)">✍️ 自定义提示词（注入全部槽位，最高优先级）</label>
+    <textarea id="cprompt" placeholder="例：更复古的胶片色调，姿势慵懒随性，避开正午硬光"></textarea>
+    <button style="width:auto;padding:7px 16px;font-size:13px" onclick="savePrompt()">保存提示词</button>
+    <span id="cp-state" style="font-size:11px;color:var(--sub);margin-left:8px"></span>
+  </div>
+  <input type="file" id="fp" accept="image/png,image/jpeg,image/webp" multiple hidden>
+</div>
 <div class="grid">
   <div class="card">
     <h2>🚀 发起生成</h2>
@@ -106,7 +145,54 @@ function renderWall(imgs){
   w.innerHTML=imgs.map(i=>`<div class="slot"><img src="${i.url}" loading="lazy">
     <div class="tag">${(i.path.split('/').pop()||'').replace(/^T001_/,'').replace('.png','')}</div></div>`).join('');
 }
-loadSkills();
+let curKind=null;
+document.getElementById('fp').addEventListener('change',async e=>{
+  const files=[...e.target.files];
+  for(const f of files){ await uploadOne(curKind,f); }
+  e.target.value='';
+});
+for(const k of ['flat','model','ref']){
+  const z=document.getElementById('z-'+k);
+  z.addEventListener('dragover',ev=>{ev.preventDefault();z.classList.add('drag')});
+  z.addEventListener('dragleave',()=>z.classList.remove('drag'));
+  z.addEventListener('drop',async ev=>{ev.preventDefault();z.classList.remove('drag');
+    for(const f of [...ev.dataTransfer.files]){await uploadOne(k,f)}});
+}
+function pick(k){curKind=k;document.getElementById('fp').click()}
+async function uploadOne(kind,f){
+  const pid=document.getElementById('pid').value.trim();
+  if(!pid){alert('请先填商品ID');return}
+  const fd=new FormData();fd.append('file',f);
+  const r=await fetch(`/assets/${pid}/${kind}`,{method:'POST',body:fd});
+  if(r.ok){log(`✓ ${kind} ← ${f.name}`);loadAssets()}
+  else{log(`✗ ${f.name}: ${(await r.json()).detail||r.status}`)}
+}
+async function loadAssets(){
+  const pid=document.getElementById('pid').value.trim();if(!pid)return;
+  const r=await fetch('/assets/'+pid);if(!r.ok)return;
+  const d=await r.json();
+  document.getElementById('assets-row').textContent=
+    `白底${d.white} · 平铺${d.flat} · 模特${d.model} · 场景${d.scene} · 参照${d.ref}`;
+  for(const k of ['flat','model','ref']){
+    const th=document.getElementById('th-'+k);th.innerHTML='';
+    (d.files||[]).filter(n=>n.startsWith(k+'_')).forEach(n=>{
+      const img=document.createElement('img');
+      img.src=`/assets-file/${pid}/${n}`;th.appendChild(img)});
+  }
+  const pr=await fetch(`/assets/${pid}/prompt`);if(pr.ok){
+    const p=await pr.json();if(p.custom_prompt)document.getElementById('cprompt').value=p.custom_prompt}
+}
+async function savePrompt(){
+  const pid=document.getElementById('pid').value.trim();
+  const txt=document.getElementById('cprompt').value.trim();
+  if(!pid){alert('请先填商品ID');return}
+  const r=await fetch(`/assets/${pid}/prompt`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({custom_prompt:txt||' '})});
+  document.getElementById('cp-state').textContent=r.ok?'✓ 已保存':'保存失败';
+  setTimeout(()=>document.getElementById('cp-state').textContent='',2000);
+}
+document.getElementById('pid').addEventListener('change',loadAssets);
+loadSkills();loadAssets();
 (async()=>{ // 恢复最近未完成任务
   const r=await fetch('/tasks'); if(!r.ok)return;
   const d=await r.json(); const t=d.tasks&&d.tasks[0];

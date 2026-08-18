@@ -38,6 +38,13 @@ workflow:
           max_length: 100
           default: T001
           options: []
+        - variable: custom_prompt
+          label: 自定义提示词(可选)
+          type: paragraph
+          required: false
+          max_length: 500
+          default: ''
+          options: []
     - id: submit
       position:
         x: 350
@@ -60,7 +67,8 @@ workflow:
           config: null
         headers: Content-Type:application/json
         params: ''
-        body: '{"skill_id": "{{#start.skill_id#}}", "product_id": "{{#start.product_id#}}"}'
+        body: '{"skill_id": "{{#start.skill_id#}}", "product_id": "{{#start.product_id#}}",
+          "custom_prompt": "{{#start.custom_prompt#}}"}'
         timeout:
           max_connect_timeout: 10
           max_read_timeout: 60

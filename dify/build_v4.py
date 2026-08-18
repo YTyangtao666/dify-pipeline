@@ -52,7 +52,10 @@ def build() -> dict:
                       "options": []},
                      {"variable": "product_id", "label": "商品ID", "type": "text-input",
                       "required": True, "max_length": 100, "default": "T001",
-                      "options": []}]}})
+                      "options": []},
+                     {"variable": "custom_prompt", "label": "自定义提示词(可选)",
+                      "type": "paragraph", "required": False, "max_length": 500,
+                      "default": "", "options": []}]}})
     nodes.append({
         "id": "submit", "position": {"x": 350, "y": 280}, "positionAbsolute": {"x": 350, "y": 280},
         "sourcePosition": "right", "targetPosition": "left", "width": 244, "height": 120,
@@ -62,7 +65,7 @@ def build() -> dict:
                  "authorization": {"type": "no-auth", "config": None},
                  "headers": 'Content-Type:application/json',
                  "params": "",
-                 "body": '{"skill_id": "{{#start.skill_id#}}", "product_id": "{{#start.product_id#}}"}',
+                 "body": '{"skill_id": "{{#start.skill_id#}}", "product_id": "{{#start.product_id#}}", "custom_prompt": "{{#start.custom_prompt#}}"}',
                  "timeout": {"max_connect_timeout": 10, "max_read_timeout": 60,
                              "max_write_timeout": 20, "max_exec_timeout": 70}}})
     nodes.append({
@@ -105,7 +108,7 @@ def self_check(dsl: dict) -> None:
     code = next(n for n in g["nodes"] if n["id"] == "poll")["data"]["code"]
     assert "127.0.0.1:8100/tasks" in code and "time.sleep(30)" in code
     start_vars = g["nodes"][0]["data"]["variables"]
-    assert {v["variable"] for v in start_vars} == {"skill_id", "product_id"}
+    assert {v["variable"] for v in start_vars} == {"skill_id", "product_id", "custom_prompt"}
     print("v4 self-check OK")
 
 

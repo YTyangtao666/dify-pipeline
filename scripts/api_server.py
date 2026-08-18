@@ -96,10 +96,52 @@ ASSETS_DIR = ROOT / "data" / "assets"
 ALLOWED_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 
 
-@app.post("/assets/{pid}/{kind}")  # kind: white=白底图 model=模特图
+@app.post("/assets/{pid}/prompt")  # 商品级自定义提示词（生成时注入全部槽位）
+def set_custom_prompt(pid: str, body: dict):
+    prompt = (body.get("custom_prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(400, "custom_prompt 不能为空")
+    if len(prompt) > 500:
+        raise HTTPException(400, "custom_prompt 超过500字")
+    d = ASSETS_DIR / pid
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "custom_prompt.txt").write_text(prompt, encoding="utf-8")
+    return {"ok": True, "pid": pid, "custom_prompt": prompt}
+
+
+@app.get("/assets/{pid}/prompt")
+def get_custom_prompt(pid: str):
+    f = ASSETS_DIR / pid / "custom_prompt.txt"
+    if not f.exists():
+        return {"custom_prompt": ""}
+    return {"custom_prompt": f.read_text(encoding="utf-8")}
+
+
+def _inject_custom_prompt(orig_prompt_fn, custom: str):
+    """包装 _build_slot_prompt：自定义提示词追加到槽位 prompt 末尾（用户级指令优先级最高）。"""
+    if not custom:
+        return orig_prompt_fn
+
+    def wrapped(plan, slot, compose_lib):
+        base = orig_prompt_fn(plan, slot, compose_lib)
+        return f"{base}\n【用户自定义要求·高优先级】{custom}"
+    return wrapped
+
+
+def _load_custom_prompt(pid: str) -> str:
+    f = ASSETS_DIR / pid / "custom_prompt.txt"
+    if f.exists():
+        try:
+            return f.read_text(encoding="utf-8").strip()
+        except Exception:  # noqa: BLE001
+            pass
+    return ""
+
+
+@app.post("/assets/{pid}/{kind}")  # kind: white/model/flat/scene/ref（分类结构化素材）
 async def upload_asset(pid: str, kind: str, file: UploadFile = File(...)):
-    if kind not in ("white", "model"):
-        raise HTTPException(400, f"kind 须为 white/model，收到 {kind}")
+    if kind not in ("white", "model", "flat", "scene", "ref"):
+        raise HTTPException(400, f"kind 须为 white/model/flat/scene/ref，收到 {kind}")
     ext = ALLOWED_TYPES.get(file.content_type or "")
     if not ext:
         raise HTTPException(415, f"仅支持 png/jpeg/webp，收到 {file.content_type}")
@@ -116,15 +158,29 @@ async def upload_asset(pid: str, kind: str, file: UploadFile = File(...)):
     return {"ok": True, "kind": kind, "path": rel, "count": n}
 
 
+@app.get("/assets-file/{pid}/{name}")  # 素材缩略图预览（仅限 ASSETS_DIR 防穿越）
+def serve_asset_file(pid: str, name: str):
+    f = (ASSETS_DIR / pid / name).resolve()
+    if not str(f).startswith(str(ASSETS_DIR.resolve())) or not f.exists() or f.is_dir():
+        raise HTTPException(404, "not found")
+    return FileResponse(f)
+
+
 @app.get("/assets/{pid}")
 def list_assets(pid: str):
     d = ASSETS_DIR / pid
     if not d.exists():
-        return {"white": 0, "model": 0, "files": []}
+        return {"white": 0, "model": 0, "flat": 0, "scene": 0, "ref": 0, "files": []}
     files = sorted(p.name for p in d.iterdir() if p.is_file())
     return {"white": sum(1 for f in files if f.startswith("white")),
             "model": sum(1 for f in files if f.startswith("model")),
+            "flat": sum(1 for f in files if f.startswith("flat")),
+            "scene": sum(1 for f in files if f.startswith("scene")),
+            "ref": sum(1 for f in files if f.startswith("ref")),
             "files": files}
+
+
+
 
 
 @app.get("/compose/presets")
@@ -414,7 +470,7 @@ def _run_skill_task(task_id: str, body: dict):
         adir = ASSETS_DIR / pid
         have = set()
         if adir.exists():
-            for kind in ("white", "flat", "model", "onbody"):
+            for kind in ("white", "flat", "model", "onbody", "scene", "ref"):
                 if list(adir.glob(f"{kind}_*")):
                     have.add(kind)
         runnable = [s for s in pack["slots"] if set(s["input_deps"]) <= have]
@@ -448,12 +504,34 @@ def _run_skill_task(task_id: str, body: dict):
                           _sp=sp_block, _orig=_orig):
             for s in _pack["slots"]:
                 if s["pos"] == slot.pos:
-                    return s["template"].format(
+                    t = s["template"].format(
                         title=_titles.get(plan2.product_id, plan2.product_id),
                         selling_points=_sp)
+                    # 用户自定义提示词（最高优先级追加）
+                    cp = _load_custom_prompt(pid)
+                    if cp:
+                        t += f"\n【用户自定义要求·高优先级】{cp}"
+                    # 参照图注入说明
+                    scene_refs = sorted((ASSETS_DIR / pid).glob("ref_*")) if adir.exists() else []
+                    if scene_refs:
+                        t += ("\n【参照图】参考图最后附带风格/构图参照图：只借鉴其风格氛围与构图思路，"
+                              "商品与模特仍以商品锚定图与模特三视图为准，严禁照抄参照图中的商品与人物。")
+                    return t
             return _orig(plan2, slot, compose_lib)
 
         _r._build_slot_prompt = _skill_prompt
+
+        # 参照图真正注入：wrap _slot_refs，把 ref_* 追加到参考图尾部（prompt 已有对应说明）
+        _orig_refs = _r._slot_refs
+
+        def _refs_with_ref_imgs(plan2, slot, _orig=_orig_refs):
+            refs = list(_orig(plan2, slot))
+            ad = ASSETS_DIR / plan2.product_id
+            if ad.exists():
+                refs.extend(sorted(ad.glob("ref_*")))
+            return refs
+
+        _r._slot_refs = _refs_with_ref_imgs
 
         def _progress(kind, slot):
             with _TASKS_LOCK:
@@ -468,6 +546,7 @@ def _run_skill_task(task_id: str, body: dict):
                                              on_progress=_progress)
         finally:
             _r._build_slot_prompt = _orig
+            _r._slot_refs = _orig_refs
         with _TASKS_LOCK:
             TASKS[task_id].update(state="done", manifest=manifest,
                                   summary=manifest.get("summary", {}))
@@ -488,6 +567,12 @@ def generate_by_skill_async(body: dict):
         except FileNotFoundError:
             return JSONResponse({"detail": f"技能包不存在: {body.get('skill_id')}"}, status_code=404)
     total = len(pack["slots"]) + 2  # 槽位 + 00A/00B 锚定图余量
+    # Dify/外部调用可带 custom_prompt：持久化到商品素材目录（生成时注入）
+    cp = (body.get("custom_prompt") or "").strip()
+    if cp:
+        pd = ASSETS_DIR / body.get("product_id", "")
+        pd.mkdir(parents=True, exist_ok=True)
+        (pd / "custom_prompt.txt").write_text(cp[:500], encoding="utf-8")
     with _TASKS_LOCK:
         TASKS[task_id] = {"state": "queued", "created": _time_mod.time(),
                           "total": total, "done_count": 0, "progress": f"0/{total}",
