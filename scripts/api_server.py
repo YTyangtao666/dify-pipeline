@@ -99,14 +99,31 @@ ALLOWED_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp
 @app.post("/assets/{pid}/prompt")  # 商品级自定义提示词（生成时注入全部槽位）
 def set_custom_prompt(pid: str, body: dict):
     prompt = (body.get("custom_prompt") or "").strip()
-    if not prompt:
-        raise HTTPException(400, "custom_prompt 不能为空")
     if len(prompt) > 500:
         raise HTTPException(400, "custom_prompt 超过500字")
     d = ASSETS_DIR / pid
     d.mkdir(parents=True, exist_ok=True)
-    (d / "custom_prompt.txt").write_text(prompt, encoding="utf-8")
+    f = d / "custom_prompt.txt"
+    if not prompt:  # 空 = 清空
+        f.unlink(missing_ok=True)
+        return {"ok": True, "pid": pid, "custom_prompt": "", "cleared": True}
+    f.write_text(prompt, encoding="utf-8")
     return {"ok": True, "pid": pid, "custom_prompt": prompt}
+
+
+@app.delete("/assets/{pid}/{name}")  # 删除素材图（仅限图片文件，防穿越）
+def delete_asset(pid: str, name: str):
+    import re as _re
+    if not _re.fullmatch(r"(white|model|flat|scene|ref)_\d+\.(png|jpg|jpeg|webp)", name):
+        raise HTTPException(400, f"仅允许删除分类素材图，收到 {name}")
+    f = (ASSETS_DIR / pid / name).resolve()
+    if not str(f).startswith(str(ASSETS_DIR.resolve())) or not f.exists():
+        raise HTTPException(404, "not found")
+    f.unlink()
+    import shutil as _sh
+    kind = name.split("_")[0]
+    left = len(list((ASSETS_DIR / pid).glob(f"{kind}_*")))
+    return {"ok": True, "deleted": name, "count_left": left}
 
 
 @app.get("/assets/{pid}/prompt")
@@ -347,12 +364,15 @@ def learn_skill(skill_id: str = Form(""), name: str = Form(""),
             "samples": len(saved)}
 
 
-@app.get("/skills")  # 技能包列表
+@app.get("/skills")  # 技能包列表（过滤自动命名的 style_* 测试包与 test_* 包）
 def list_skills():
     d = ROOT / "data" / "skills"
     out = []
     if d.exists():
         for f in sorted(d.glob("*.json")):
+            sid = f.stem
+            if sid.startswith(("style_", "test_")):  # 过滤自动命名包与测试包
+                continue
             try:
                 pack = json.loads(f.read_text(encoding="utf-8"))
                 out.append({"skill_id": pack["skill_id"], "name": pack.get("name", ""),
@@ -566,7 +586,15 @@ def generate_by_skill_async(body: dict):
             pack = style_learner_lib.load_skill_pack(body.get("skill_id", ""), data_dir=ASSETS_DIR)
         except FileNotFoundError:
             return JSONResponse({"detail": f"技能包不存在: {body.get('skill_id')}"}, status_code=404)
+    # retry 模式只跑失败槽位：分母按实际将执行数（读旧 manifest failed 数）
     total = len(pack["slots"]) + 2  # 槽位 + 00A/00B 锚定图余量
+    if body.get("retry_failed"):
+        mf = ROOT / "output" / "bundles" / f"{body.get('product_id','')}_{body.get('skill_id','')}" / "manifest.json"
+        try:
+            prev = json.loads(mf.read_text(encoding="utf-8"))
+            total = max(1, len(prev.get("failed", [])))
+        except Exception:  # noqa: BLE001
+            pass
     # Dify/外部调用可带 custom_prompt：持久化到商品素材目录（生成时注入）
     cp = (body.get("custom_prompt") or "").strip()
     if cp:

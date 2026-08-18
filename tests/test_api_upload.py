@@ -55,3 +55,47 @@ def test_custom_prompt_injected_into_skill_prompt(tmp_path, monkeypatch):
     # 模拟异步任务路径: srv._run_skill_task 太重,直接测注入函数
     got = wrapped(None, None, None)
     assert "基础模板" in got and "复古胶片" in got
+
+
+def test_delete_asset(tmp_path, monkeypatch):
+    """删除素材图 + 安全校验(防路径穿越/防删非图)。"""
+    from fastapi.testclient import TestClient
+    from scripts import api_server as srv
+    monkeypatch.setattr(srv, "ASSETS_DIR", tmp_path)
+    monkeypatch.setattr(srv, "ROOT", tmp_path)
+    d = tmp_path / "P88"; d.mkdir(parents=True)
+    (d / "ref_1.png").write_bytes(b"x")
+    (d / "custom_prompt.txt").write_text("t")
+    client = TestClient(srv.app)
+    r = client.delete("/assets/P88/ref_1.png")
+    assert r.status_code == 200 and r.json()["count_left"] == 0
+    assert not (d / "ref_1.png").exists()
+    # 穿越与非法名拒绝（URL编码的 ../ 与非图文件）
+    assert client.delete("/assets/P88/%2e%2e/P88_bomb").status_code in (400, 404)
+    assert client.delete("/assets/P88/custom_prompt.txt").status_code == 400  # 非图片拒删
+
+
+def test_empty_prompt_clears(tmp_path, monkeypatch):
+    """空 custom_prompt = 清空(而非400)。"""
+    from fastapi.testclient import TestClient
+    from scripts import api_server as srv
+    monkeypatch.setattr(srv, "ASSETS_DIR", tmp_path)
+    monkeypatch.setattr(srv, "ROOT", tmp_path)
+    d = tmp_path / "P88"; d.mkdir(parents=True)
+    (d / "custom_prompt.txt").write_text("旧提示词")
+    client = TestClient(srv.app)
+    r = client.post("/assets/P88/prompt", json={"custom_prompt": ""})
+    assert r.status_code == 200
+    assert not (d / "custom_prompt.txt").exists()
+    assert client.get("/assets/P88/prompt").json()["custom_prompt"] == ""
+
+
+def test_skills_list_filters_test_packs():
+    """技能包列表过滤测试包(style_*/test_*)。"""
+    from fastapi.testclient import TestClient
+    from scripts import api_server as srv
+    client = TestClient(srv.app)
+    d = client.get("/skills").json()
+    for s in d["skills"]:
+        assert not s["skill_id"].startswith("test_"), s
+        assert not s["skill_id"].startswith("style_"), s
