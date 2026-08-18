@@ -107,4 +107,13 @@ function renderWall(imgs){
     <div class="tag">${(i.path.split('/').pop()||'').replace(/^T001_/,'').replace('.png','')}</div></div>`).join('');
 }
 loadSkills();
+(async()=>{ // 恢复最近未完成任务
+  const r=await fetch('/tasks'); if(!r.ok)return;
+  const d=await r.json(); const t=d.tasks&&d.tasks[0];
+  if(t&&(t.state==='running'||t.state==='queued')){
+    tid=t.task_id; log('↻ 恢复进行中任务 '+tid+' ('+(t.progress||'')+ ')');
+    document.getElementById('go').disabled=true;
+    timer=setInterval(poll,2000);
+  } else if(t&&t.state==='done'){ tid=t.task_id; poll(); }
+})();
 </script></body></html>
