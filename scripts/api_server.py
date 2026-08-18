@@ -99,8 +99,8 @@ ALLOWED_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp
 @app.post("/assets/{pid}/prompt")  # 商品级自定义提示词（生成时注入全部槽位）
 def set_custom_prompt(pid: str, body: dict):
     prompt = (body.get("custom_prompt") or "").strip()
-    if len(prompt) > 500:
-        raise HTTPException(400, "custom_prompt 超过500字")
+    if len(prompt) > 2000:
+        raise HTTPException(400, "custom_prompt 超过2000字")
     d = ASSETS_DIR / pid
     d.mkdir(parents=True, exist_ok=True)
     f = d / "custom_prompt.txt"
@@ -609,7 +609,7 @@ def generate_by_skill_async(body: dict):
     if cp:
         pd = ASSETS_DIR / body.get("product_id", "")
         pd.mkdir(parents=True, exist_ok=True)
-        (pd / "custom_prompt.txt").write_text(cp[:500], encoding="utf-8")
+        (pd / "custom_prompt.txt").write_text(cp[:2000], encoding="utf-8")
     with _TASKS_LOCK:
         TASKS[task_id] = {"state": "queued", "created": _time_mod.time(),
                           "total": total, "done_count": 0, "progress": f"0/{total}",
