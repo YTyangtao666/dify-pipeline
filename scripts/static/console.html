@@ -55,7 +55,8 @@ textarea{width:100%;min-height:64px;padding:10px 12px;border:1px solid var(--lin
 a{color:var(--gold2)}
 </style></head><body><div class="lightbox" id="lb" onclick="this.style.display='none'"><img id="lbimg"></div>
 <div class="wrap">
-<h1>🎨 电商图工厂 · 技能包控制台</h1>
+<h1>🎨 电商图工厂 · 技能包控制台
+  <span id="ver" style="font-size:10px;color:#b8a888;font-weight:400;vertical-align:middle;margin-left:8px">v1.3</span></h1>
 <div class="sub">选技能包 + 商品素材 → 一键生成（双锚定：商品特写 + 模特三视图 + 套图）</div>
 <div class="card" style="margin-bottom:16px">
   <h2>📥 商品素材上传 <span class="kind-badge" id="assets-row">未加载</span></h2>
@@ -169,8 +170,13 @@ for(const k of ['flat','model','ref']){
   z.addEventListener('dragover',ev=>{ev.preventDefault();ev.dataTransfer.dropEffect='copy';z.classList.add('drag')});
   z.addEventListener('dragleave',ev=>{if(!z.contains(ev.relatedTarget))z.classList.remove('drag')});
   z.addEventListener('drop',async ev=>{ev.preventDefault();z.classList.remove('drag');
-    const fs=[...(ev.dataTransfer?.files||[])];
-    if(!fs.length){log('⚠ 未识别到文件(某些App拖出不可读),请改用点击选择');return}
+    let fs=[...(ev.dataTransfer?.files||[])];
+    if(!fs.length){ // 兜底:某些App(微信)拖出仅items可读
+      for(const it of (ev.dataTransfer?.items||[])){
+        if(it.kind==='file'){const f=it.getAsFile();if(f)fs.push(f)}
+      }
+    }
+    if(!fs.length){log('⚠ 未识别到文件,请改用点击选择上传');return}
     for(const f of fs){await uploadOne(k,f)}});
 }
 // 全局兜底:阻止浏览器默认"拖入打开文件",让拖拽在整个页面都安全
@@ -183,7 +189,11 @@ async function uploadOne(kind,f){
   if(!pid){alert('请先填商品ID');return}
   const fd=new FormData();fd.append('file',f);
   const r=await fetch(`/assets/${pid}/${kind}`,{method:'POST',body:fd});
-  if(r.ok){log(`✓ ${kind} ← ${f.name}`);loadAssets()}
+  if(r.ok){log(`✓ ${kind} ← ${f.name}`);
+    const z=document.getElementById('z-'+kind);
+    z.style.outline='3px solid #7fb069';z.style.outlineOffset='2px';
+    setTimeout(()=>{z.style.outline=''},900);
+    loadAssets()}
   else{log(`✗ ${f.name}: ${(await r.json()).detail||r.status}`)}
 }
 async function loadAssets(){
