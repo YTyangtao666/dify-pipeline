@@ -246,6 +246,9 @@ def generate_bundle(body: dict):
 @app.get("/bundle/{pid}/{bid}/status")  # 查询某套餐 manifest
 def bundle_status(pid: str, bid: str):
     mf = ROOT / "output" / "bundles" / f"{pid}_{bid}" / "manifest.json"
+    # 技能包容错：bid 带 skill_ 前缀时（历史调用习惯），映射到 {pid}_{skill_id} 目录
+    if not mf.exists() and bid.startswith("skill_"):
+        mf = ROOT / "output" / "bundles" / f"{pid}_{bid[len('skill_'):]}" / "manifest.json"
     if not mf.exists():
         return {"state": "not_started"}
     m = json.loads(mf.read_text(encoding="utf-8"))
