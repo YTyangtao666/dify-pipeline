@@ -2,8 +2,8 @@
   "skill_id": "test_casual",
   "name": "休闲风",
   "title_hint": "",
-  "created": "2026-08-17T17:15:31",
-  "learned_from": "/private/var/folders/ky/_93g3fn944j_f3539fykfhmw0000gp/T/pytest-of-Admin/pytest-377/test_learn_skill_from_images0/_samples/test_casual",
+  "created": "2026-08-18T12:00:10",
+  "learned_from": "/private/var/folders/ky/_93g3fn944j_f3539fykfhmw0000gp/T/pytest-of-Admin/pytest-416/test_learn_skill_from_images0/_samples/test_casual",
   "slots": [
     {
       "pos": 1,
