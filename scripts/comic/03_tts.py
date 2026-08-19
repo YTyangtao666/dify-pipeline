@@ -27,10 +27,24 @@ AUDIO = OUT_DIR / "audio"
 FFMPEG = "ffmpeg"
 
 VOICE_MAP = {
+    # 旁白:沉稳播音腔压低
     "narrator": ("zh-CN-YunyangNeural", "-12%", "-2Hz"),
-    "林渊": ("zh-CN-YunxiNeural", "-8%", "-1Hz"),
-    "赵管事": ("zh-CN-YunjianNeural", "+5%", "+2Hz"),
-    "系统": ("zh-CN-YunjianNeural", "-15%", "-5Hz"),
+    # 秦阳:18岁少年主角,清亮少年音
+    "秦阳": ("zh-CN-YunxiNeural", "-8%", "-1Hz"),
+    # 壮汉(逃犯):粗犷凶狠
+    "壮汉": ("zh-CN-YunjianNeural", "+5%", "+2Hz"),
+    "逃犯": ("zh-CN-YunjianNeural", "+5%", "+2Hz"),
+    # 蓝若:18岁冷艳校花
+    "蓝若": ("zh-CN-XiaoyiNeural", "-10%", "-1Hz"),
+    # 秦岚:审判庭冷酷女长官(青年偏高冷)
+    "秦岚": ("zh-CN-XiaoyiNeural", "+0%", "-4Hz"),
+    # 蓝莹:30岁女管家
+    "蓝莹": ("zh-CN-XiaoxiaoNeural", "-15%", "-3Hz"),
+    # 黑衣人:统一低沉机械
+    "黑衣男": ("zh-CN-YunjianNeural", "-15%", "-5Hz"),
+    "另一黑衣男": ("zh-CN-YunjianNeural", "-15%", "-5Hz"),
+    # 兜底:未登记角色一律旁白声
+    "_default": ("zh-CN-YunyangNeural", "-12%", "-2Hz"),
 }
 
 CLEAN_RE = re.compile(r'^["\'\u201c\u201d]+|["\'\u201c\u201d]+$')
@@ -41,10 +55,23 @@ def clean(line: str) -> str:
 
 
 async def synth_one(text: str, voice: str, rate: str, pitch: str, out: Path) -> None:
-    c = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
-    await c.save(str(out))
-    if out.stat().st_size == 0:
-        raise RuntimeError(f"empty audio {out}")
+    """edge-tts 概率性 NoAudioReceived(服务端抖动),重试3次。"""
+    import edge_tts.exceptions
+
+    for attempt in range(3):
+        c = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+        try:
+            await c.save(str(out))
+        except edge_tts.exceptions.NoAudioReceived:
+            print(f"    tts retry {attempt+1}/3: {text[:20]}...")
+            await asyncio.sleep(2)
+            continue
+        if out.stat().st_size == 0:
+            print(f"    tts empty retry {attempt+1}/3: {text[:20]}...")
+            await asyncio.sleep(2)
+            continue
+        return
+    raise RuntimeError(f"tts failed after 3 retries: {text[:40]}")
 
 
 def concat(files: list[Path], out: Path, gap_ms: int = 250) -> None:
@@ -83,7 +110,7 @@ async def main() -> None:
             if not line:
                 continue
             f = AUDIO / f"shot_{no:02d}_dlg_{role}.mp3"
-            v, r, p = VOICE_MAP.get(role, VOICE_MAP["narrator"])
+            v, r, p = VOICE_MAP.get(role) or VOICE_MAP["_default"]
             await synth_one(line, v, r, p, f)
             parts.append(f)
         if not parts:
