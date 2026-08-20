@@ -104,12 +104,14 @@ async def main() -> None:
             v, r, p = VOICE_MAP["narrator"]
             await synth_one(nar, v, r, p, f)
             parts.append(f)
-        for d in s.get("dialogue") or []:
+        # 分片文件名必须带台词序号:同角色多条台词时,仅按角色命名会互相覆盖
+        # → 第2条覆盖第1条(内容丢失),且 parts 里两个相同 Path 被 concat 拼两遍(配音重复)
+        for di, d in enumerate(s.get("dialogue") or []):
             role = d.get("role") or "narrator"
             line = clean(d.get("line") or "")
             if not line:
                 continue
-            f = AUDIO / f"shot_{no:02d}_dlg_{role}.mp3"
+            f = AUDIO / f"shot_{no:02d}_dlg{di:02d}_{role}.mp3"
             v, r, p = VOICE_MAP.get(role) or VOICE_MAP["_default"]
             await synth_one(line, v, r, p, f)
             parts.append(f)
